@@ -1,13 +1,11 @@
 /* Syto — CoLaba Production */
 :root{
-  --bg:#f3f0e8; --card:#fffdf8; --ink:#1a1c20; --muted:#62666e; --line:#e0dacb; --accent:#0b4f9e; --top:#0b3a6f; --top-ink:#fff;
-  --ok:#14603a; --ok-bg:#e1f0e6; --one:#7a5600; --one-bg:#f6ecd0; --st:#643a88; --st-bg:#eee4f6; --fc:#a02c1c; --fc-bg:#f8e2dd; --loud:#8a3b00; --loud-bg:#fbe7d3;
+  /* Одна тема за рішенням власника (21.11): чорне тло, білий текст, синім — усе, що натискається, і слова з поясненням. */
+  color-scheme: dark;
+  --bg:#000000; --card:#0f1114; --ink:#ffffff; --muted:#a9adb5; --line:#2a2d33; --accent:#5aa8ff; --top:#07090c; --top-ink:#ffffff;
+  --ok:#7fd3a2; --ok-bg:#12281b; --one:#e6c66a; --one-bg:#2b240e; --st:#cfa9ee; --st-bg:#251b30; --fc:#f29a8b; --fc-bg:#321713; --loud:#f0b27a; --loud-bg:#301e0d;
   --serif: Georgia, "Times New Roman", "Noto Serif", serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
-}
-@media (prefers-color-scheme: dark){
-  :root{ --bg:#111317; --card:#1a1d23; --ink:#eceae4; --muted:#a0a4ac; --line:#2c3038; --accent:#8ab8f5; --top:#0d2238; --top-ink:#f2f4f8;
-    --ok:#7fd3a2; --ok-bg:#16301f; --one:#e6c66a; --one-bg:#332a10; --st:#cfa9ee; --st-bg:#2b1f38; --fc:#f29a8b; --fc-bg:#3a1a15; --loud:#f0b27a; --loud-bg:#38230f; }
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -15,7 +13,7 @@ html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--sans);padding-bottom:calc(68px + env(safe-area-inset-bottom))}
 a{color:var(--accent)}
 :focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
-.top{position:sticky;top:0;z-index:5;background:var(--top);color:var(--top-ink);display:flex;align-items:center;justify-content:space-between;gap:12px;
+.top{position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line);background:var(--top);color:var(--top-ink);display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:calc(10px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left))}
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
 .logo{width:34px;height:34px;flex:none;color:#ffd24a}

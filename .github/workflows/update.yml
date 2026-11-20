@@ -3,7 +3,9 @@ name: Оновлення новин
 
 on:
   schedule:
-    - cron: '7,37 * * * *'   # двічі на годину (GitHub може запізнюватися на 5–20 хв)
+    # Чотири рази на день: 07:07, 12:07, 17:07, 21:07 за Києвом узимку (час тут у UTC;
+    # улітку виходить на годину пізніше). GitHub може запізнюватися на 5–20 хв.
+    - cron: '7 5,10,15,19 * * *'
   workflow_dispatch:          # кнопка «Run workflow» для ручного запуску
   push:
     branches: [main]
@@ -36,9 +38,8 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TRANSLATE_MODEL: ${{ vars.TRANSLATE_MODEL }}
-          # ПАУЗА 21.11: нові переклади зупинено до з'ясування витрат (0 = не перекладати нове;
-          # уже перекладене береться з кешу безкоштовно). Щоб увімкнути — поверни ${{ vars.TRANSLATE_MAX_NEW }}.
-          TRANSLATE_MAX_NEW: '0'
+          # Щоб зупинити нові переклади (витрати), постав тут '0': уже перекладене береться з кешу безкоштовно.
+          TRANSLATE_MAX_NEW: ${{ vars.TRANSLATE_MAX_NEW }}
       - name: Зберегти кеш перекладів
         run: |
           date -u +%F > data/heartbeat.txt

@@ -34,7 +34,7 @@ export function parseReply(textReply, expected) {
   return out.map((x) => x.trim().slice(0, 400));
 }
 
-async function callAnthropic(titles, { apiKey, model, fetchImpl }) {
+async function callAnthropic(titles, { apiKey, model, fetchImpl, usage }) {
   const res = await fetchImpl('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
@@ -43,10 +43,11 @@ async function callAnthropic(titles, { apiKey, model, fetchImpl }) {
   });
   if (!res.ok) throw new Error(`Anthropic HTTP ${res.status}`);
   const j = await res.json();
+  if (usage) { usage.calls++; usage.input += j?.usage?.input_tokens ?? 0; usage.output += j?.usage?.output_tokens ?? 0; }
   return j?.content?.map((c) => c.text ?? '').join('') ?? '';
 }
 
-async function callGemini(titles, { apiKey, model, fetchImpl }) {
+async function callGemini(titles, { apiKey, model, fetchImpl, usage }) {
   const res = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
@@ -55,6 +56,7 @@ async function callGemini(titles, { apiKey, model, fetchImpl }) {
   });
   if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
   const j = await res.json();
+  if (usage) { usage.calls++; usage.input += j?.usageMetadata?.promptTokenCount ?? 0; usage.output += j?.usageMetadata?.candidatesTokenCount ?? 0; }
   return j?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
 }
 
@@ -70,7 +72,7 @@ export function pickProvider(env) {
  * Повертає статистику. Помилка одного пакета не валить збірку: ці заголовки лишаються в оригіналі до наступного запуску.
  */
 export async function translateItems(items, cache, { provider, maxNew = 400, fetchImpl = fetch, now = Date.now() } = {}) {
-  const stats = { provider: provider?.name ?? null, fromCache: 0, translated: 0, failed: 0, skipped: 0, errors: [] };
+  const stats = { provider: provider?.name ?? null, model: provider?.model ?? null, fromCache: 0, translated: 0, failed: 0, skipped: 0, errors: [], usage: { calls: 0, input: 0, output: 0 } };
   const foreign = items.filter((i) => i.lang !== 'uk');
   // перекладаємо заголовок і короткий опис; спершу всі заголовки, потім описи — щоб при ліміті заголовки не лишалися без перекладу
   const fields = [['title', 'titleUk'], ['summary', 'summaryUk']];
@@ -96,7 +98,7 @@ export async function translateItems(items, cache, { provider, maxNew = 400, fet
     // не блокував решту 24. Текст, що не вдався й наодинці, лишається в оригіналі до наступного запуску.
     const run = async (batch) => {
       try {
-        const reply = await provider.call(batch, { apiKey: provider.apiKey, model: provider.model, fetchImpl });
+        const reply = await provider.call(batch, { apiKey: provider.apiKey, model: provider.model, fetchImpl, usage: stats.usage });
         const out = parseReply(reply, batch.length);
         // o — оригінал: потрібен, щоб перевіряти якість перекладу проти джерела
         batch.forEach((t, j) => { cache[key(t)] = { t: out[j], o: t, ts: now }; });

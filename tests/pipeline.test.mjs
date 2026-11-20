@@ -161,6 +161,13 @@ for (const [name, env] of [['Gemini', { GEMINI_API_KEY: 'test' }], ['Anthropic',
   });
 }
 
+test('ЗБІРКА: пауза перекладу (TRANSLATE_MAX_NEW=0) не робить платних викликів', async () => {
+  const r = await run({ ANTHROPIC_API_KEY: 'test', TRANSLATE_MAX_NEW: '0' });
+  assert.equal(r.fetchImpl.calls.translate, 0);
+  assert.equal(r.data.stats.translation.translated, 0);
+  assert.ok(r.written);
+});
+
 test('ЗБІРКА: збій перекладача не валить збірку', async () => {
   const { data, written } = await run({ ANTHROPIC_API_KEY: 'test' }, { translatorFails: true });
   assert.ok(written);

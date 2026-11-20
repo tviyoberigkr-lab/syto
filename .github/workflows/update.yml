@@ -36,7 +36,9 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TRANSLATE_MODEL: ${{ vars.TRANSLATE_MODEL }}
-          TRANSLATE_MAX_NEW: ${{ vars.TRANSLATE_MAX_NEW }}
+          # ПАУЗА 21.11: нові переклади зупинено до з'ясування витрат (0 = не перекладати нове;
+          # уже перекладене береться з кешу безкоштовно). Щоб увімкнути — поверни ${{ vars.TRANSLATE_MAX_NEW }}.
+          TRANSLATE_MAX_NEW: '0'
       - name: Зберегти кеш перекладів
         run: |
           date -u +%F > data/heartbeat.txt

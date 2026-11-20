@@ -60,7 +60,7 @@ export async function build({
 
   let cache = {};
   try { cache = JSON.parse(await readFile(cachePath, 'utf8')); } catch { /* першого разу кешу ще немає */ }
-  const tr = await translateItems(items, cache, { provider: pickProvider(env), maxNew: Number(env.TRANSLATE_MAX_NEW || 400), fetchImpl, now });
+  const tr = await translateItems(items, cache, { provider: pickProvider(env), maxNew: env.TRANSLATE_MAX_NEW === undefined || env.TRANSLATE_MAX_NEW === '' ? 400 : Number(env.TRANSLATE_MAX_NEW), fetchImpl, now });
   for (const it of items) it.cmp = it.titleUk || it.title;
 
   const { tabs, stories } = assemble(items, sources, now);
@@ -86,6 +86,7 @@ export async function build({
 
   log(`Готово: ${stories.length} новин із ${items.length} повідомлень; стрічок працює ${okFeeds}/${sources.length}.`);
   log(`Переклад: ${tr.provider ?? 'вимкнено (немає ключа)'}; нових ${tr.translated}, з кешу ${tr.fromCache}, помилок ${tr.failed}, у черзі ${tr.skipped}.`);
+  if (tr.usage.calls) log(`Токени перекладу (${tr.model}): запитів ${tr.usage.calls}, вхід ${tr.usage.input}, вихід ${tr.usage.output}.`);
   for (const e of tr.errors.slice(0, 3)) log(`  переклад: ${e}`);
   for (const h of health.filter((x) => !x.ok)) log(`  ✗ ${h.name}: ${h.error}`);
   return { written: true, data };

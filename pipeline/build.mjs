@@ -101,7 +101,7 @@ export async function build({
 
   log(`Готово: ${stories.length} новин із ${items.length} повідомлень (свіжих із мережі ${all.length}, зі сховища ${kept}); стрічок працює ${okFeeds}/${sources.length}.`);
   log(`Переклад: ${tr.provider ?? 'вимкнено (немає ключа)'}; нових ${tr.translated}, з кешу ${tr.fromCache}, помилок ${tr.failed}, у черзі ${tr.skipped}.`);
-  if (tr.usage.calls) log(`Токени перекладу (${tr.model}): запитів ${tr.usage.calls}, вхід ${tr.usage.input}, вихід ${tr.usage.output}.`);
+  if (tr.usage.calls) log(`Токени перекладу (${tr.model}): запитів ${tr.usage.calls}, вхід ${tr.usage.input}, вихід ${tr.usage.output} (з них на міркування ${tr.usage.thinking}).`);
   for (const e of tr.errors.slice(0, 3)) log(`  переклад: ${e}`);
   for (const h of health.filter((x) => !x.ok)) log(`  ✗ ${h.name}: ${h.error}`);
   return { written: true, data };

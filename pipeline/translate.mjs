@@ -3,7 +3,7 @@
 // CoLaba Production
 import { createHash } from 'node:crypto';
 
-export const BATCH = 25;
+export const BATCH = 15; // менший пакет: відповідь не впирається в ліміт довжини
 const CONCURRENCY = 4;
 const CACHE_DAYS = 10;
 
@@ -86,15 +86,25 @@ export function parseReply(textReply, expected) {
 }
 
 async function callAnthropic(titles, { apiKey, model, fetchImpl, usage }) {
-  const res = await fetchImpl('https://api.anthropic.com/v1/messages', {
+  // Haiku 5.5 за замовчуванням «думає» перед відповіддю, і ці токени оплачуються як вихідні
+  // (20–21.11 виходило ~300–800 вихідних токенів на один короткий текст). Для перекладу заголовків
+  // міркування не потрібні — вимикаємо. Документація: thinking {type: "disabled"} дозволено для Haiku 5.5.
+  const noThinking = /^claude-haiku/.test(model);
+  const send = (withFlag) => fetchImpl('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model, max_tokens: 8000, messages: [{ role: 'user', content: PROMPT(titles) }] }),
-    signal: AbortSignal.timeout(60000),
+    body: JSON.stringify({ model, max_tokens: 8000, ...(withFlag ? { thinking: { type: 'disabled' } } : {}), messages: [{ role: 'user', content: PROMPT(titles) }] }),
+    signal: AbortSignal.timeout(90000),
   });
+  let res = await send(noThinking);
+  if (res.status === 400 && noThinking) res = await send(false); // якщо API не прийняв параметр — працюємо як раніше
   if (!res.ok) throw new Error(`Anthropic HTTP ${res.status}`);
   const j = await res.json();
-  if (usage) { usage.calls++; usage.input += j?.usage?.input_tokens ?? 0; usage.output += j?.usage?.output_tokens ?? 0; }
+  if (usage) {
+    usage.calls++; usage.input += j?.usage?.input_tokens ?? 0; usage.output += j?.usage?.output_tokens ?? 0;
+    usage.thinking += j?.usage?.output_tokens_details?.thinking_tokens ?? 0;
+  }
+  if (j?.stop_reason === 'max_tokens') throw new Error('відповідь обрізано лімітом max_tokens');
   return j?.content?.map((c) => c.text ?? '').join('') ?? '';
 }
 
@@ -124,7 +134,7 @@ export function pickProvider(env) {
  * Повертає статистику. Помилка одного пакета не валить збірку: ці заголовки лишаються в оригіналі до наступного запуску.
  */
 export async function translateItems(items, cache, { provider, maxNew = 400, fetchImpl = fetch, now = Date.now() } = {}) {
-  const stats = { provider: provider?.name ?? null, model: provider?.model ?? null, fromCache: 0, translated: 0, failed: 0, skipped: 0, errors: [], usage: { calls: 0, input: 0, output: 0 } };
+  const stats = { provider: provider?.name ?? null, model: provider?.model ?? null, fromCache: 0, translated: 0, failed: 0, skipped: 0, errors: [], usage: { calls: 0, input: 0, output: 0, thinking: 0 } };
   const foreign = items.filter((i) => i.lang !== 'uk');
   // перекладаємо заголовок і короткий опис; спершу всі заголовки, потім описи — щоб при ліміті заголовки не лишалися без перекладу
   const fields = [['title', 'titleUk', 'titleGloss'], ['summary', 'summaryUk', 'summaryGloss']];

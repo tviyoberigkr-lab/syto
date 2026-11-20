@@ -10,7 +10,7 @@
     {"id": "babel", "name": "Бабель", "enabled": false, "note": "20.11.2026: адреса RSS дає 404 з GitHub, чинну не знайдено", "feed": "https://babel.ua/rss", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
     {"id": "svoboda", "name": "Радіо Свобода", "feed": "https://www.radiosvoboda.org/api/zrqiteuuir", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
     {"id": "eurointegration", "name": "Європейська правда", "feed": "https://www.eurointegration.com.ua/rss/view_news/", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
-    {"id": "epravda", "name": "Економічна правда", "feed": "https://www.epravda.com.ua/rss/view_news/", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
+    {"id": "epravda", "name": "Економічна правда", "feed": "https://www.epravda.com.ua/rss/", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
     {"id": "ukrinform", "name": "Укрінформ", "feed": "https://www.ukrinform.ua/rss/block-lastnews", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "state", "trust": 2},
     {"id": "bbc-uk", "name": "BBC News Україна", "feed": "https://feeds.bbci.co.uk/ukrainian/rss.xml", "lang": "uk", "country": "GB", "cat": "ukraine", "type": "public", "trust": 3},
     {"id": "dw-uk", "name": "DW українською", "feed": "https://rss.dw.com/rdf/rss-ukr-all", "lang": "uk", "country": "DE", "cat": "world", "type": "public", "trust": 3},
@@ -26,7 +26,7 @@
     {"id": "novaya-eu", "name": "Новая газета Европа", "feed": "https://novayagazeta.eu/feed/rss", "lang": "ru", "country": "RU", "cat": "world", "type": "exile", "trust": 2},
 
     {"id": "scmp-china", "name": "South China Morning Post", "feed": "https://www.scmp.com/rss/4/feed", "lang": "en", "country": "CN", "cat": "world", "type": "independent", "trust": 2},
-    {"id": "caixin", "name": "Caixin Global", "feed": "https://www.caixinglobal.com/rss", "lang": "en", "country": "CN", "cat": "world", "type": "independent", "trust": 2},
+    {"id": "caixin", "name": "Caixin Global", "enabled": false, "note": "21.11.2026: відмовляє GitHub (403), запасна офіційна стрічка не оновлюється з 2025", "feed": "https://www.caixinglobal.com/rss", "lang": "en", "country": "CN", "cat": "world", "type": "independent", "trust": 2},
     {"id": "xinhua", "name": "Сіньхуа (Xinhua)", "feed": "http://www.xinhuanet.com/english/rss/worldrss.xml", "lang": "en", "country": "CN", "cat": "world", "type": "state", "trust": 1},
 
     {"id": "bbc-tech", "name": "BBC Technology", "feed": "https://feeds.bbci.co.uk/news/technology/rss.xml", "lang": "en", "country": "GB", "cat": "tech", "type": "public", "trust": 3},
@@ -38,6 +38,11 @@
     {"id": "scmp-tech", "name": "SCMP Tech", "feed": "https://www.scmp.com/rss/36/feed", "lang": "en", "country": "CN", "cat": "tech", "type": "independent", "trust": 2},
     {"id": "ain", "name": "AIN.UA", "feed": "https://ain.ua/feed/", "lang": "uk", "country": "UA", "cat": "tech", "type": "independent", "trust": 2},
 
+    {"id": "hromadske-radio", "name": "Громадське радіо", "feed": "https://hromadske.radio/feed", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
+    {"id": "skynews-world", "name": "Sky News", "feed": "https://feeds.skynews.com/feeds/rss/world.xml", "lang": "en", "country": "GB", "cat": "world", "type": "independent", "trust": 2},
+    {"id": "hkfp", "name": "Hong Kong Free Press", "feed": "https://hongkongfp.com/feed/", "lang": "en", "country": "HK", "cat": "world", "type": "independent", "trust": 3},
+    {"id": "cdt", "name": "China Digital Times", "feed": "https://chinadigitaltimes.net/feed/", "lang": "en", "country": "US", "cat": "world", "type": "independent", "trust": 2},
+    {"id": "ukrinform-factcheck", "name": "Укрінформ — Фактчек (державне агентство)", "feed": "https://www.ukrinform.ua/rss/rubric-factcheck", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 2},
     {"id": "stopfake", "name": "StopFake", "feed": "https://www.stopfake.org/uk/feed/", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 3},
     {"id": "voxcheck", "name": "VoxCheck", "feed": "https://voxukraine.org/category/voxcheck/feed", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 3},
     {"id": "behindthenews", "name": "По той бік новин", "enabled": false, "note": "20.11.2026: адреса RSS дає 404 з GitHub, чинну не знайдено", "feed": "https://behindthenews.ua/feed/", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 3}

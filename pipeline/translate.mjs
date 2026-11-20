@@ -15,23 +15,74 @@ const PROMPT = (titles) =>
   '1. Передавай ЗМІСТ, а не слова: текст має звучати так, як його написав би український журналіст. Жодної кальки.\n' +
   '2. Нічого не додавай і не прибирай: факти, цифри, імена, ступінь упевненості («може», «за даними», «ймовірно») — як в оригіналі.\n' +
   '3. Не пом’якшуй і не підсилюй тон. Не додавай оцінок.\n' +
-  '4. Терміни та ідіоми перекладай за значенням. Якщо усталеного українського відповідника немає — коротко поясни суть. ' +
+  '4. Терміни та ідіоми перекладай за значенням. Якщо усталеного українського відповідника немає — перекладай за змістом; пояснення давай у полі g (правило 8), а не в самому тексті. ' +
   'Приклади: «canary tokens / canaries» у кібербезпеці — «секрети-приманки» (не «канарки»); «plants» про дані — «підкидає», «розміщує» (не «засаджує»); ' +
   '«supply chain» — «ланцюг постачання»; «zero-day» — «вразливість нульового дня»; «whistleblower» — «викривач»; «breaking» — «терміново».\n' +
   '5. Власні назви — за чинним українським правописом; назви компаній і продуктів латинкою не перекладай (OpenAI, Claude, Gemini).\n' +
   '7. Не вгадуй стать людини: якщо в оригіналі її не видно (officer, chief, minister без імені), вживай загальну форму посади («директор», «керівник»), а не фемінітив.\n' +
   '6. Якщо заголовок неможливо зрозуміти без контексту — переклади якнайближче до тексту, нічого не вигадуй.\n' +
-  'Поверни ТІЛЬКИ JSON-масив рядків тієї самої довжини й у тому ж порядку, без пояснень.\n\n' +
+  '8. Пояснення термінів. Познач у перекладі до 2 слів чи словосполучень, яких пересічний український читач може не знати: ' +
+  'сленг, професійний жаргон, вузькі терміни, маловідомі абревіатури. НЕ пояснюй: звичайні слова, імена людей, назви країн, міст, ' +
+  'компаній і продуктів, загальновідомі абревіатури (ООН, НАТО, ЄС, США, ШІ, ЗСУ). Якщо сумніваєшся — не пояснюй: у більшості текстів термінів немає. ' +
+  'Пояснення — одне нейтральне речення українською до 120 знаків, без оцінок і без фактів, яких немає в загальновживаному значенні терміна; ' +
+  'починай його з терміна в початковій формі, наприклад: «Секрети-приманки — мічені фальшиві дані, які підкидають у систему, щоб виявити витік.»\n' +
+  'Формат відповіді: ТІЛЬКИ JSON-масив тієї самої довжини й у тому ж порядку, без пояснень поза ним. Кожен елемент — або рядок із перекладом ' +
+  '(якщо термінів немає), або об’єкт {"t": "переклад", "g": [{"w": "термін рівно так, як він написаний у перекладі", "e": "пояснення"}]}.\n\n' +
   JSON.stringify(titles);
 
-export function parseReply(textReply, expected) {
+const MAX_TEXT = 400;
+const MAX_TERMS = 2;
+const MAX_TERM = 60;       // довше — це вже не термін, а фраза: відкидаємо, а не обрізаємо (обрізаний термін безглуздий)
+const MAX_EXPL = 160;      // у промпті просимо до 120, тут запас; довше — обрізаємо по слову
+const QUOTES = /^[«»"„“”'’]+|[«»"„“”'’]+$/g;
+
+function cutWords(s, max) {
+  if (s.length <= max) return s;
+  const t = s.slice(0, max);
+  const sp = t.lastIndexOf(' ');
+  return (sp > max * 0.6 ? t.slice(0, sp) : t).replace(/[,;:.\-–—\s]+$/, '') + '…';
+}
+
+/** Перевіряє список термінів g проти перекладу t. Некоректні терміни відкидаються мовчки — переклад лишається. */
+export function cleanGloss(g, t) {
+  if (!Array.isArray(g)) return [];
+  const out = [];
+  for (const x of g) {
+    if (out.length >= MAX_TERMS) break;
+    if (!x || typeof x !== 'object' || typeof x.w !== 'string' || typeof x.e !== 'string') continue;
+    const w = x.w.replace(/\s+/g, ' ').trim().replace(QUOTES, '').trim();
+    const e = x.e.replace(/\s+/g, ' ').trim();
+    if (w.length < 2 || w.length > MAX_TERM || !e || w === t) continue;
+    if (!t.includes(w)) continue;                                   // термін має стояти в перекладі дослівно
+    if (out.some((o) => o.w.includes(w) || w.includes(o.w))) continue; // без накладань
+    out.push({ w, e: cutWords(e, MAX_EXPL) });
+  }
+  return out;
+}
+
+/**
+ * Розбирає відповідь перекладача. Елемент масиву — рядок (переклад) або {t, g}.
+ * Повертає [{t, g?}]. Кидає помилку лише якщо зіпсований сам переклад (тоді пакет ділиться навпіл);
+ * зіпсовані терміни просто відкидаються.
+ */
+export function parseEntries(textReply, expected) {
   const m = String(textReply).match(/\[[\s\S]*\]/);
   if (!m) throw new Error('у відповіді немає JSON-масиву');
   const out = JSON.parse(m[0]);
-  if (!Array.isArray(out) || out.length !== expected || out.some((x) => typeof x !== 'string' || !x.trim())) {
-    throw new Error(`очікував ${expected} рядків, отримав ${Array.isArray(out) ? out.length : 'не масив'}`);
+  const textOf = (x) => (typeof x === 'string' ? x : x && typeof x === 'object' && typeof x.t === 'string' ? x.t : null);
+  if (!Array.isArray(out) || out.length !== expected || out.some((x) => !textOf(x)?.trim())) {
+    throw new Error(`очікував ${expected} перекладів, отримав ${Array.isArray(out) ? out.length : 'не масив'}`);
   }
-  return out.map((x) => x.trim().slice(0, 400));
+  return out.map((x) => {
+    const t = textOf(x).trim().slice(0, MAX_TEXT);
+    const g = typeof x === 'object' ? cleanGloss(x.g, t) : [];
+    return g.length ? { t, g } : { t };
+  });
+}
+
+/** Лише тексти перекладів (сумісність зі старим кодом і тестами). */
+export function parseReply(textReply, expected) {
+  return parseEntries(textReply, expected).map((x) => x.t);
 }
 
 async function callAnthropic(titles, { apiKey, model, fetchImpl, usage }) {
@@ -68,22 +119,27 @@ export function pickProvider(env) {
 
 /**
  * Додає items[i].titleUk для неукраїнських заголовків.
- * cache: { [hash]: { t: переклад, ts: коли } } — змінюється на місці.
+ * cache: { [hash]: { t: переклад, o: оригінал, g?: [{w, e}] терміни з поясненнями, ts: коли } } — змінюється на місці.
+ * Записи без g (старі або без термінів) працюють як раніше. Терміни кладуться в items[i].titleGloss / summaryGloss.
  * Повертає статистику. Помилка одного пакета не валить збірку: ці заголовки лишаються в оригіналі до наступного запуску.
  */
 export async function translateItems(items, cache, { provider, maxNew = 400, fetchImpl = fetch, now = Date.now() } = {}) {
   const stats = { provider: provider?.name ?? null, model: provider?.model ?? null, fromCache: 0, translated: 0, failed: 0, skipped: 0, errors: [], usage: { calls: 0, input: 0, output: 0 } };
   const foreign = items.filter((i) => i.lang !== 'uk');
   // перекладаємо заголовок і короткий опис; спершу всі заголовки, потім описи — щоб при ліміті заголовки не лишалися без перекладу
-  const fields = [['title', 'titleUk'], ['summary', 'summaryUk']];
+  const fields = [['title', 'titleUk', 'titleGloss'], ['summary', 'summaryUk', 'summaryGloss']];
   const todo = [];
   const seen = new Set();
   const apply = (count) => {
-    for (const [src, dst] of fields) for (const it of foreign) {
+    for (const [src, dst, gl] of fields) for (const it of foreign) {
       const text = it[src];
       if (!text || it[dst]) continue;
       const k = key(text);
-      if (cache[k]) { it[dst] = cache[k].t; if (now - cache[k].ts > 86400e3) cache[k].ts = now; if (count) stats.fromCache++; }
+      if (cache[k]) {
+        it[dst] = cache[k].t;
+        const g = cleanGloss(cache[k].g, cache[k].t); // перевіряємо й кеш: його могли редагувати руками
+        if (g.length) it[gl] = g;
+        if (now - cache[k].ts > 86400e3) cache[k].ts = now; if (count) stats.fromCache++; }
       else if (count && !seen.has(k)) { seen.add(k); todo.push(text); }
     }
   };
@@ -99,9 +155,9 @@ export async function translateItems(items, cache, { provider, maxNew = 400, fet
     const run = async (batch) => {
       try {
         const reply = await provider.call(batch, { apiKey: provider.apiKey, model: provider.model, fetchImpl, usage: stats.usage });
-        const out = parseReply(reply, batch.length);
-        // o — оригінал: потрібен, щоб перевіряти якість перекладу проти джерела
-        batch.forEach((t, j) => { cache[key(t)] = { t: out[j], o: t, ts: now }; });
+        const out = parseEntries(reply, batch.length);
+        // o — оригінал: потрібен, щоб перевіряти якість перекладу проти джерела; g — лише коли є терміни
+        batch.forEach((t, j) => { cache[key(t)] = { t: out[j].t, o: t, ...(out[j].g ? { g: out[j].g } : {}), ts: now }; });
         stats.translated += batch.length;
       } catch (e) {
         if (batch.length > 1 && !/HTTP (401|403|429|5\d\d)/.test(String(e.message))) {

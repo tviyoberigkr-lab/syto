@@ -4,3 +4,4 @@ prototype/
 tests/shot-*.png
 Project status/
 workflow_update.yml
+data/items.json

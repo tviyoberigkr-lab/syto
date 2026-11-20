@@ -30,6 +30,16 @@ export const demoTranslations = {
   'Demo wire: officials praise record harvest figures': 'Демо: чиновники хвалять рекордні показники врожаю',
   'Demo lab unveils open AI model for weather forecasting': 'Демо: лабораторія представила відкриту модель ШІ для прогнозу погоди',
   'Demo: quantum chip sets new stability record': 'Демо: квантовий чип встановив новий рекорд стабільності',
+  // Новий формат відповіді: переклад + терміни з поясненнями. Перший — термін уже в лапках (лапки не подвоюються),
+  // другий — без лапок (інтерфейс додасть їх сам).
+  'Demo: researcher plants 2 million canary tokens in AI supply chain': {
+    t: 'Демо: дослідник підкинув у ланцюг постачання ШІ 2 мільйони «секретів-приманок»',
+    g: [{ w: 'секретів-приманок', e: 'Секрети-приманки — мічені фальшиві дані, які підкидають у систему, щоб виявити витік.' }],
+  },
+  'Demo summary: the method can reveal a supply chain attack before it spreads.': {
+    t: 'Демо-опис: так можна помітити атаку на ланцюг постачання ще до її поширення.',
+    g: [{ w: 'атаку на ланцюг постачання', e: 'Атака на ланцюг постачання — злам не самої цілі, а сторонніх програм чи сервісів, якими вона користується.' }],
+  },
 };
 
 const rss = (items, now) => `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>demo</title>${items.map((i) =>
@@ -89,6 +99,7 @@ export function demoFeeds(now = Date.now()) {
   put('https://demo.invalid/tech.rss', rss([
     { t: 'Demo lab unveils open AI model for weather forecasting', l: u('t1'), h: 2 },
     { t: 'Demo: quantum chip sets new stability record', l: u('t2'), h: 10 },
+    { t: 'Demo: researcher plants 2 million canary tokens in AI supply chain', l: u('t3'), h: 3, d: 'Demo summary: the method can reveal a supply chain attack before it spreads.' },
   ], now));
   put('https://demo.invalid/tech2.rss', rss([
     { t: 'Демо: лабораторія представила відкриту модель ШІ для прогнозу погоди', l: u('t2a'), h: 1.8, d: 'Модель доступна дослідникам безкоштовно. Це вигадана новина для показу.' },
@@ -113,8 +124,9 @@ function encode1251(str) {
   return Buffer.from(out);
 }
 
-/** Підробний fetch для тестів і прототипу: віддає демо-стрічки й «перекладає» за словником. */
-export function demoFetch(now = Date.now(), { translatorFails = false } = {}) {
+/** Підробний fetch для тестів і прототипу: віддає демо-стрічки й «перекладає» за словником.
+ *  Елемент словника — рядок або {t, g} (переклад із термінами), як у справжній відповіді моделі. */
+export function demoFetch(now = Date.now(), { translatorFails = false, failFeeds = [] } = {}) {
   const feeds = demoFeeds(now);
   const calls = { feeds: 0, translate: 0 };
   const impl = async (url, opts = {}) => {
@@ -130,6 +142,7 @@ export function demoFetch(now = Date.now(), { translatorFails = false } = {}) {
       return new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/json' } });
     }
     calls.feeds++;
+    if (failFeeds.includes(url)) return new Response('Forbidden', { status: 403 });
     const f = feeds.get(url);
     if (!f) throw new Error('getaddrinfo ENOTFOUND');
     return new Response(f.body, { status: f.status, headers: { 'content-type': f.contentType } });

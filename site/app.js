@@ -60,6 +60,79 @@
     return null;
   }
 
+  // ---------- терміни з поясненнями ----------
+  var OPEN_Q = '«"„“', CLOSE_Q = '»"“”';
+  var glossSeq = 0;
+
+  /** Ділить текст на шматки: {text} і {term, expl, quoted}. Шукає кожен термін один раз, без накладань. */
+  function segments(text, gloss) {
+    var found = [];
+    (gloss || []).forEach(function (g) {
+      if (!g || typeof g.w !== 'string' || typeof g.e !== 'string' || !g.w) return;
+      var i = text.indexOf(g.w);
+      if (i < 0) return;
+      var a = i, b = i + g.w.length;
+      // термін уже в лапках — забираємо їх у кнопку, щоб не подвоювати і щоб лапки теж були сині
+      var quoted = a > 0 && b < text.length && OPEN_Q.indexOf(text.charAt(a - 1)) >= 0 && CLOSE_Q.indexOf(text.charAt(b)) >= 0;
+      if (quoted) { a--; b++; }
+      if (found.some(function (f) { return a < f.b && b > f.a; })) return;
+      found.push({ a: a, b: b, expl: g.e, quoted: quoted });
+    });
+    found.sort(function (x, y) { return x.a - y.a; });
+    var out = [], pos = 0;
+    found.forEach(function (f) {
+      if (f.a > pos) out.push({ text: text.slice(pos, f.a) });
+      var t = text.slice(f.a, f.b);
+      out.push({ term: f.quoted ? t : '«' + t + '»', expl: f.expl });
+      pos = f.b;
+    });
+    if (pos < text.length) out.push({ text: text.slice(pos) });
+    return out;
+  }
+
+  /**
+   * Наповнює parent текстом із кнопками-термінами. Звичайні шматки — посилання (якщо href) або текст.
+   * Повертає блок пояснення (схований) або null, якщо термінів немає.
+   * Кнопка не вкладена в <a>: заголовок складається з кількох посилань і кнопок між ними.
+   */
+  function fillWithTerms(parent, text, gloss, href) {
+    var segs = segments(text, gloss);
+    var box = null;
+    segs.forEach(function (sg) {
+      if (sg.term == null) { parent.appendChild(href ? link(href, sg.text) : document.createTextNode(sg.text)); return; }
+      if (!box) {
+        box = el('p', 'gloss');
+        box.id = 'gloss-' + (++glossSeq);
+        box.hidden = true;
+        box.setAttribute('aria-live', 'polite');
+      }
+      var btn = el('button', 'term', sg.term);
+      btn.type = 'button';
+      btn.setAttribute('aria-expanded', 'false');
+      btn.setAttribute('aria-controls', box.id);
+      btn.setAttribute('data-expl', sg.expl);
+      parent.appendChild(btn);
+    });
+    return box;
+  }
+
+  /** Клік по терміну: показує пояснення під текстом; повторний клік або інший термін — закриває/перемикає. */
+  function onTermClick(e) {
+    var btn = e.target.closest ? e.target.closest('.term') : null;
+    if (!btn) return;
+    e.preventDefault();
+    var cardEl = btn.closest('.card');
+    var wasOpen = btn.getAttribute('aria-expanded') === 'true';
+    Array.prototype.forEach.call(cardEl.querySelectorAll('.term[aria-expanded="true"]'), function (b) { b.setAttribute('aria-expanded', 'false'); });
+    Array.prototype.forEach.call(cardEl.querySelectorAll('.gloss'), function (g) { g.hidden = true; g.textContent = ''; });
+    if (wasOpen) return;
+    var box = document.getElementById(btn.getAttribute('aria-controls'));
+    if (!box) return;
+    btn.setAttribute('aria-expanded', 'true');
+    box.textContent = btn.getAttribute('data-expl');
+    box.hidden = false;
+  }
+
   function badge(story) {
     var n = story.confirmations;
     if (story.status === 'confirmed') return el('span', 'badge b-confirmed', '✔ Підтверджено · ' + n + ' ' + plural(n, 'незалежне джерело', 'незалежні джерела', 'незалежних джерел'));
@@ -74,10 +147,17 @@
     badges.appendChild(badge(story));
     if (story.clickbait) badges.appendChild(el('span', 'badge b-loud', 'Крикливий заголовок'));
     li.appendChild(badges);
+    var gl = story.gloss || {};
     var h = el('h3');
-    h.appendChild(link(story.url, story.title));
+    var hBox = fillWithTerms(h, story.title, gl.title, story.url);
     li.appendChild(h);
-    if (story.summary) li.appendChild(el('p', 'sum', story.summary));
+    if (hBox) li.appendChild(hBox);
+    if (story.summary) {
+      var sum = el('p', 'sum');
+      var sBox = fillWithTerms(sum, story.summary, gl.summary, null);
+      li.appendChild(sum);
+      if (sBox) li.appendChild(sBox);
+    }
     var names = [];
     story.sources.forEach(function (s) { if (names.indexOf(s.name) < 0) names.push(s.name); });
     var shown = names.slice(0, 2).join(', ') + (names.length > 2 ? ' та ще ' + (names.length - 2) : '');
@@ -136,10 +216,11 @@
      ['b-single', '● Одне джерело', 'Поки пише лише одна редакція. Може бути правдою, але варто дочекатися підтвердження.'],
      ['b-state', '▲ Лише державне ЗМІ', 'Повідомляє тільки державне видання. Це офіційна позиція влади, а не незалежна перевірка.'],
      ['b-loud', 'Крикливий заголовок', 'Заголовок тисне на емоції. Такі новини Syto опускає нижче.'],
-     ['b-factcheck', '✖ Спростування', 'Фактчекери перевірили поширене твердження і пояснили, що з ним не так.']
+     ['b-factcheck', '✖ Спростування', 'Фактчекери перевірили поширене твердження і пояснили, що з ним не так.'],
+     ['term-sample', '«синє слово»', 'Сленг або вузький термін. Натисніть на нього — під текстом з’явиться коротке пояснення (його пише ШІ разом із перекладом, тому є лише в новинах іноземних редакцій).']
     ].forEach(function (r) {
       var li = el('li');
-      var sp = el('span'); sp.appendChild(el('span', 'badge ' + r[0], r[1]));
+      var sp = el('span'); sp.appendChild(el('span', r[0] === 'term-sample' ? r[0] : 'badge ' + r[0], r[1]));
       li.appendChild(sp); li.appendChild(el('span', null, r[2]));
       lg.appendChild(li);
     });
@@ -256,6 +337,7 @@
     renderFeed();
   });
   $('refresh').addEventListener('click', function () { load(); });
+  $('list').addEventListener('click', onTermClick);
   window.addEventListener('hashchange', route);
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden && Date.now() - state.loadedAt > REFRESH_MS) load();

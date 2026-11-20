@@ -57,15 +57,46 @@ async def main():
                     txt = await page.locator('#feed-view').inner_text()
                     check(must in txt and await page.locator('.card').count() > 0, f'вкладка {tab} показує свої новини')
                 check(await page.locator('#filters').is_hidden(), 'у «Фейках» фільтр приховано')
+                # терміни з поясненнями (демо-новина у вкладці «Технології та ШІ»)
+                await page.click('.tabs a[data-tab="tech"]')
+                await page.wait_for_function("document.getElementById('view-title').textContent === 'Технології та ШІ'")
+                terms = page.locator('.card .term')
+                check(await terms.count() >= 2, f'сині слова-терміни є ({await terms.count()})')
+                tt = await terms.first.inner_text()
+                check(tt.startswith('«') and tt.endswith('»') and '««' not in tt and '»»' not in tt, f'термін у лапках, без подвоєння ({tt})')
+                st = await page.eval_on_selector('.card .term', """b => { const c = b.closest('.card'); const a = c.querySelector('h3 a');
+                    const cs = getComputedStyle(b); const lum = s => { const v = s.match(/[\\d.]+/g).slice(0,3).map(x => { x = x/255; return x <= 0.03928 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4); }); return 0.2126*v[0]+0.7152*v[1]+0.0722*v[2]; };
+                    const L1 = lum(cs.color), L2 = lum(getComputedStyle(c).backgroundColor);
+                    return { term: cs.color, text: getComputedStyle(a).color, deco: cs.textDecorationLine, tag: b.tagName, inLink: !!b.closest('a'),
+                             contrast: (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05), h: b.getBoundingClientRect().height }; }""")
+                check(st['term'] != st['text'], f"колір терміна відрізняється від звичайного тексту ({st['term']} проти {st['text']})")
+                check(st['contrast'] >= 4.5, f"термін читається на тлі картки (контраст {st['contrast']:.1f}:1)")
+                check(st['deco'] == 'none', 'термін без підкреслення')
+                check(st['tag'] == 'BUTTON' and not st['inLink'], 'термін — справжня кнопка, не всередині посилання')
+                check(st['h'] >= 36, f"зона натискання терміна зручна ({st['h']:.0f}px заввишки)")
+                url0, pages0 = page.url, len(ctx.pages)
+                await terms.first.click(); await page.wait_for_timeout(200)
+                box = page.locator('.card .gloss:visible')
+                gtxt = await box.first.inner_text() if await box.count() else ''
+                check(await box.count() == 1 and 'Секрети-приманки' in gtxt, f'клік показує пояснення ({gtxt[:40]}…)')
+                check(await terms.first.get_attribute('aria-expanded') == 'true', 'aria-expanded=true після кліку')
+                check(page.url == url0 and len(ctx.pages) == pages0, 'клік по терміну не відкриває статтю й не змінює адресу')
+                await terms.nth(1).click(); await page.wait_for_timeout(200)
+                gtxt2 = await page.locator('.card .gloss:visible').first.inner_text() if await page.locator('.card .gloss:visible').count() else ''
+                check(await page.locator('.card .gloss:visible').count() == 1 and 'Атака на ланцюг' in gtxt2 and await terms.first.get_attribute('aria-expanded') == 'false', 'інший термін перемикає пояснення')
+                await terms.nth(1).click(); await page.wait_for_timeout(200)
+                check(await page.locator('.card .gloss:visible').count() == 0 and await terms.nth(1).get_attribute('aria-expanded') == 'false', 'повторний клік ховає пояснення')
                 await page.click('.tabs a[data-tab="method"]')
                 await page.wait_for_selector('.srctable li')
                 check(await page.locator('.srctable li').count() == len(data['sources']), 'сторінка «Як це працює» показує всі джерела')
                 check(await page.locator('.dot.bad').count() == 1, 'стрічку, що не відповіла, позначено червоним')
-                for tab in ['ukraine', 'method']:
+                for tab in ['ukraine', 'tech', 'method']:
                     await page.goto(f'http://127.0.0.1:{PORT}/#{tab}'); await page.wait_for_timeout(200)
                     over = await page.evaluate('document.documentElement.scrollWidth - window.innerWidth')
                     check(over <= 0, f'немає горизонтальної прокрутки ({tab})')
-                    small = await page.evaluate("[...document.querySelectorAll('button, .tabs a, summary')].filter(e => e.offsetParent && (e.getBoundingClientRect().height < 44)).length")
+                    # .term — кнопка в рядку тексту: 44px заввишки вона розсунула б рядки заголовка; її зону натискання
+                    # перевіряємо окремо вище (padding із від'ємним margin), тут виключаємо
+                    small = await page.evaluate("[...document.querySelectorAll('button:not(.term), .tabs a, summary')].filter(e => e.offsetParent && (e.getBoundingClientRect().height < 44)).length")
                     check(small == 0, f'усі кнопки не менші за 44px ({tab})')
                     await page.screenshot(path=os.path.join(ROOT, f'tests/shot-{scheme}-{tab}.png'))
                 if scheme == 'light':

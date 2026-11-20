@@ -30,6 +30,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Сховище повідомлень за 48 год живе в кеші Actions (не в історії репозиторію).
+      - uses: actions/cache@v4
+        with:
+          path: data/items.json
+          key: syto-items-${{ github.run_id }}
+          restore-keys: syto-items-
       - name: Перевірка коду
         run: npm test
       - name: Збір і просіювання новин

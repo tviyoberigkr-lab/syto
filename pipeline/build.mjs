@@ -4,13 +4,13 @@
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseFeed, normalizeItems, assemble } from './lib.mjs';
+import { parseFeed, normalizeItems, assemble, WINDOW_HOURS } from './lib.mjs';
 import { translateItems, pickProvider } from './translate.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const UA = 'Mozilla/5.0 (compatible; SytoNewsBot/1.0; +https://tviyoberigkr-lab.github.io/syto/)';
 
-async function fetchFeed(url, fetchImpl, timeoutMs) {
+async function fetchFeed(url, fetchImpl, timeoutMs, retryPauseMs = 0) {
   let lastErr;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -25,7 +25,7 @@ async function fetchFeed(url, fetchImpl, timeoutMs) {
       const head = buf.subarray(0, 200).toString('latin1');
       const enc = (res.headers.get('content-type')?.match(/charset=([\w-]+)/i)?.[1] || head.match(/encoding=["']([\w-]+)["']/i)?.[1] || 'utf-8').toLowerCase();
       try { return new TextDecoder(enc).decode(buf); } catch { return new TextDecoder('utf-8').decode(buf); }
-    } catch (e) { lastErr = e; }
+    } catch (e) { lastErr = e; if (attempt === 0 && retryPauseMs) await new Promise((r) => setTimeout(r, retryPauseMs)); }
   }
   throw lastErr;
 }
@@ -34,13 +34,15 @@ export async function build({
   sourcesPath = resolve(ROOT, 'sources.json'),
   outPath = resolve(ROOT, 'site/data/news.json'),
   cachePath = resolve(ROOT, 'data/translations.json'),
+  storePath = resolve(ROOT, 'data/items.json'),
+  retryPauseMs = 5000,
   env = process.env, fetchImpl = fetch, now = Date.now(), timeoutMs = 20000, log = console.log,
 } = {}) {
   const sources = JSON.parse(await readFile(sourcesPath, 'utf8')).sources.filter((s) => s.enabled !== false);
   const health = [];
   const all = [];
   const results = await Promise.allSettled(sources.map(async (s) => {
-    const xml = await fetchFeed(s.feed, fetchImpl, timeoutMs);
+    const xml = await fetchFeed(s.feed, fetchImpl, timeoutMs, retryPauseMs);
     return normalizeItems(parseFeed(xml), s, now);
   }));
   results.forEach((r, i) => {
@@ -55,8 +57,19 @@ export async function build({
 
   // однакове посилання з двох стрічок одного видання — один запис
   const byId = new Map();
-  for (const it of all) if (!byId.has(it.id)) byId.set(it.id, it);
+  // Сховище повідомлень за останні 48 год: якщо стрічка цього разу не відповіла (Суспільне відмовляє
+  // GitHub через раз) або вже витіснила запис новішими, він не зникає зі стрічки Syto.
+  let kept = 0;
+  try {
+    const active = new Set(sources.map((s) => s.id));
+    for (const it of JSON.parse(await readFile(storePath, 'utf8'))) {
+      if (it && active.has(it.src) && typeof it.ts === 'number' && now - it.ts <= WINDOW_HOURS * 3600e3 && it.ts <= now) byId.set(it.id, it);
+    }
+    kept = byId.size;
+  } catch { /* першого разу сховища ще немає */ }
+  for (const it of all) byId.set(it.id, it); // свіже з мережі має перевагу
   const items = [...byId.values()];
+  const storeSnapshot = JSON.stringify(items.map(({ id, title, url, ts, summary, src, lang }) => ({ id, title, url, ts, summary, src, lang })));
 
   let cache = {};
   try { cache = JSON.parse(await readFile(cachePath, 'utf8')); } catch { /* першого разу кешу ще немає */ }
@@ -83,8 +96,10 @@ export async function build({
   await rename(outPath + '.tmp', outPath);
   await mkdir(dirname(cachePath), { recursive: true });
   await writeFile(cachePath, JSON.stringify(cache));
+  await mkdir(dirname(storePath), { recursive: true });
+  await writeFile(storePath, storeSnapshot);
 
-  log(`Готово: ${stories.length} новин із ${items.length} повідомлень; стрічок працює ${okFeeds}/${sources.length}.`);
+  log(`Готово: ${stories.length} новин із ${items.length} повідомлень (свіжих із мережі ${all.length}, зі сховища ${kept}); стрічок працює ${okFeeds}/${sources.length}.`);
   log(`Переклад: ${tr.provider ?? 'вимкнено (немає ключа)'}; нових ${tr.translated}, з кешу ${tr.fromCache}, помилок ${tr.failed}, у черзі ${tr.skipped}.`);
   if (tr.usage.calls) log(`Токени перекладу (${tr.model}): запитів ${tr.usage.calls}, вхід ${tr.usage.input}, вихід ${tr.usage.output}.`);
   for (const e of tr.errors.slice(0, 3)) log(`  переклад: ${e}`);

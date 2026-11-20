@@ -199,6 +199,17 @@ export function clusterItems(items) {
   return clusters.map((c) => c.members.map((m) => m.item));
 }
 
+/**
+ * Пояснення термінів для картки: лише для перекладених текстів, які справді показуються.
+ * Повертає {title?, summary?} або undefined, щоб у news.json поле було тільки там, де є терміни.
+ */
+function glossFor(titleGloss, summaryGloss) {
+  const g = {};
+  if (titleGloss?.length) g.title = titleGloss;
+  if (summaryGloss?.length) g.summary = summaryGloss;
+  return g.title || g.summary ? g : undefined;
+}
+
 /** Перетворює групу повідомлень на картку новини зі статусом підтвердження та оцінкою. */
 export function buildStory(members, srcMap, now = Date.now()) {
   const withSrc = members.map((m) => ({ ...m, source: srcMap.get(m.src) })).filter((m) => m.source);
@@ -222,9 +233,11 @@ export function buildStory(members, srcMap, now = Date.now()) {
   const score = Math.round(
     (status === 'confirmed' ? 30 + 8 * (Math.min(independent.size, 5) - 2) : 0) +
     trustMax * 5 - ageH * 1.5 - (clickbait ? 15 : 0) - (stateOnly ? 10 : 0));
+  const gloss = glossFor(lead.titleUk && lead.titleGloss, lead.lang !== 'uk' && lead.summaryUk && lead.summaryGloss);
   return {
     id: lead.id, title,
     summary: lead.lang === 'uk' ? lead.summary : (lead.summaryUk || ''),
+    ...(gloss ? { gloss } : {}),
     url: lead.url, ts: firstTs, lastTs,
     status, confirmations: independent.size, clickbait,
     translated: !!lead.titleUk,
@@ -250,8 +263,9 @@ export function assemble(items, sources, now = Date.now()) {
   }
   const fakeStories = facts.sort((a, b) => b.ts - a.ts).slice(0, PER_TAB_LIMIT).map((f) => {
     const s = srcMap.get(f.src);
+    const gloss = glossFor(f.titleUk && f.titleGloss);
     return {
-      id: f.id, title: f.titleUk || f.title, summary: f.summary, url: f.url, ts: f.ts, lastTs: f.ts,
+      id: f.id, title: f.titleUk || f.title, summary: f.summary, ...(gloss ? { gloss } : {}), url: f.url, ts: f.ts, lastTs: f.ts,
       status: 'factcheck', confirmations: 0, clickbait: false, translated: !!f.titleUk, cats: ['fakes'], score: 0,
       sources: [{ id: s.id, name: s.name, type: s.type, lang: f.lang, url: f.url, title: f.title, ts: f.ts }],
     };

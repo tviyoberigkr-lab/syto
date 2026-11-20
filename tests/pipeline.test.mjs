@@ -5,7 +5,7 @@ import { mkdtemp, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cleanText, safeUrl, parseFeed, normalizeItems, stems, similarity, isClickbait, isTech, clusterItems } from '../pipeline/lib.mjs';
-import { parseReply, pickProvider } from '../pipeline/translate.mjs';
+import { parseReply, parseEntries, pickProvider, translateItems } from '../pipeline/translate.mjs';
 import { build } from '../pipeline/build.mjs';
 import { demoSources, demoFetch } from '../tools/demo_feeds.mjs';
 
@@ -17,7 +17,7 @@ async function run(env = {}, fetchOpts = {}, dir) {
   await writeFile(sourcesPath, JSON.stringify({ sources: demoSources }));
   const fetchImpl = demoFetch(NOW, fetchOpts);
   const logs = [];
-  const r = await build({ sourcesPath, outPath: join(dir, 'out/news.json'), cachePath: join(dir, 'cache/tr.json'), env, fetchImpl, now: NOW, log: (l) => logs.push(l) });
+  const r = await build({ sourcesPath, outPath: join(dir, 'out/news.json'), cachePath: join(dir, 'cache/tr.json'), storePath: join(dir, 'cache/items.json'), retryPauseMs: 0, env, fetchImpl, now: NOW, log: (l) => logs.push(l) });
   return { ...r, dir, fetchImpl, logs };
 }
 const byTitle = (data, part) => data.stories.find((s) => s.title.includes(part));
@@ -99,6 +99,74 @@ test('parseReply перевіряє довжину відповіді перек
   assert.throws(() => parseReply('вибачте', 1));
 });
 
+test('parseEntries: змішаний масив рядків і об’єктів із термінами', () => {
+  const reply = 'Ось: ' + JSON.stringify([
+    'Звичайний переклад',
+    { t: 'Хакери використали «вразливість нульового дня»', g: [{ w: 'вразливість нульового дня', e: 'Вразливість нульового дня — помилка, про яку розробник ще не знає.' }] },
+    { t: 'Переклад без термінів у вигляді об’єкта' },
+  ]);
+  const out = parseEntries(reply, 3);
+  assert.deepEqual(out[0], { t: 'Звичайний переклад' });
+  assert.equal(out[1].g.length, 1);
+  assert.equal(out[1].g[0].w, 'вразливість нульового дня');
+  assert.deepEqual(out[2], { t: 'Переклад без термінів у вигляді об’єкта' });
+  assert.deepEqual(parseReply(reply, 3), ['Звичайний переклад', 'Хакери використали «вразливість нульового дня»', 'Переклад без термінів у вигляді об’єкта']);
+});
+
+test('parseEntries: термін, якого немає в перекладі, відкидається, переклад лишається', () => {
+  const out = parseEntries(JSON.stringify([{ t: 'Уряд ухвалив бюджет', g: [
+    { w: 'канарки', e: 'Чого немає в тексті.' },
+    { w: '«бюджет»', e: 'Бюджет — план доходів і витрат.' },  // лапки навколо терміна знімаються
+  ] }]), 1);
+  assert.equal(out[0].t, 'Уряд ухвалив бюджет');
+  assert.deepEqual(out[0].g.map((x) => x.w), ['бюджет']);
+});
+
+test('parseEntries: зіпсоване g не валить пакет, зайві й задовгі терміни обрізаються', () => {
+  const t = 'Текст із термінами альфа, бета і гамма';
+  const out = parseEntries(JSON.stringify([
+    { t: 'Перший', g: 'не масив' },
+    { t: 'Другий', g: [null, 5, { w: 7, e: 'x' }, { w: 'Другий' }] },
+    { t, g: [{ w: 'альфа', e: 'А'.repeat(500) }, { w: 'бета', e: 'Б.' }, { w: 'гамма', e: 'В.' }] },
+    { t: 'Четвертий текст', g: [{ w: 'Четвертий ' + 'дуже '.repeat(20), e: 'задовгий термін' }] },
+  ]), 4);
+  assert.deepEqual(out[0], { t: 'Перший' });
+  assert.deepEqual(out[1], { t: 'Другий' });
+  assert.equal(out[2].g.length, 2, 'не більше 2 термінів');
+  assert.ok(out[2].g[0].e.length <= 161, 'задовге пояснення обрізане');
+  assert.deepEqual(out[3], { t: 'Четвертий текст' });
+  // а от зіпсований сам переклад — це помилка пакета (далі він ділиться навпіл)
+  assert.throws(() => parseEntries(JSON.stringify([{ g: [] }]), 1));
+});
+
+test('кеш без поля g (старі записи) працює як раніше', async () => {
+  const items = [{ lang: 'en', title: 'Old cached title' }];
+  const { createHash } = await import('node:crypto');
+  const k = createHash('sha1').update('Old cached title').digest('hex').slice(0, 16);
+  const cache = { [k]: { t: 'Старий переклад', ts: NOW } };
+  const st = await translateItems(items, cache, { provider: null, now: NOW });
+  assert.equal(items[0].titleUk, 'Старий переклад');
+  assert.equal(items[0].titleGloss, undefined);
+  assert.equal(st.fromCache, 1);
+});
+
+test('ЗБІРКА: терміни доходять до картки в news.json і беруться з кешу без платних викликів', async () => {
+  const first = await run({ ANTHROPIC_API_KEY: 'test' });
+  const saved = JSON.parse(await readFile(join(first.dir, 'out/news.json'), 'utf8'));
+  const s = byTitle(saved, 'секретів-приманок');
+  assert.ok(s, 'демо-новина з терміном є');
+  assert.deepEqual(s.gloss.title.map((x) => x.w), ['секретів-приманок']);
+  assert.match(s.gloss.title[0].e, /^Секрети-приманки — /);
+  assert.deepEqual(s.gloss.summary.map((x) => x.w), ['атаку на ланцюг постачання']);
+  assert.ok(s.title.includes(s.gloss.title[0].w) && s.summary.includes(s.gloss.summary[0].w));
+  assert.equal(saved.stories.filter((x) => x.gloss).length, 1, 'поле gloss лише там, де є терміни');
+  const cache = JSON.parse(await readFile(join(first.dir, 'cache/tr.json'), 'utf8'));
+  assert.equal(Object.values(cache).filter((x) => x.g).length, 2, 'g у кеші лише для двох текстів із термінами');
+  const second = await run({ ANTHROPIC_API_KEY: 'test' }, {}, first.dir);
+  assert.equal(second.fetchImpl.calls.translate, 0);
+  assert.deepEqual(byTitle(second.data, 'секретів-приманок').gloss, s.gloss);
+});
+
 test('pickProvider: без ключа — null', () => {
   assert.equal(pickProvider({}), null);
   assert.equal(pickProvider({ GEMINI_API_KEY: 'k' }).name, 'gemini');
@@ -152,11 +220,11 @@ for (const [name, env] of [['Gemini', { GEMINI_API_KEY: 'test' }], ['Anthropic',
     const ai = byTitle(d, 'модель ШІ');
     assert.equal(ai.confirmations, 2, 'англомовна й українська техноновина зійшлися');
     assert.equal(byTitle(d, 'рекордні').status, 'state');
-    assert.equal(d.stats.translation.translated, 9);
+    assert.equal(d.stats.translation.translated, 11, '9 старих текстів + заголовок і опис демо-новини з термінами');
     // другий запуск: усе з кешу, платних викликів немає
     const second = await run(env, {}, first.dir);
     assert.equal(second.fetchImpl.calls.translate, 0);
-    assert.equal(second.data.stats.translation.fromCache, 9);
+    assert.equal(second.data.stats.translation.fromCache, 11);
     assert.equal(byTitle(second.data, 'міст через річку').confirmations, 4);
   });
 }
@@ -171,7 +239,7 @@ test('ЗБІРКА: пауза перекладу (TRANSLATE_MAX_NEW=0) не р�
 test('ЗБІРКА: збій перекладача не валить збірку', async () => {
   const { data, written } = await run({ ANTHROPIC_API_KEY: 'test' }, { translatorFails: true });
   assert.ok(written);
-  assert.equal(data.stats.translation.failed, 9);
+  assert.equal(data.stats.translation.failed, 11);
   assert.ok(byTitle(data, 'undersea cable'));
 });
 
@@ -181,9 +249,22 @@ test('ЗБІРКА: якщо впали майже всі стрічки — с�
   await writeFile(sourcesPath, JSON.stringify({ sources: demoSources }));
   const outPath = join(dir, 'news.json');
   await writeFile(outPath, '{"keep":true}');
-  const r = await build({ sourcesPath, outPath, cachePath: join(dir, 'c.json'), env: {}, fetchImpl: async () => { throw new Error('мережі немає'); }, now: NOW, log: () => {} });
+  const r = await build({ sourcesPath, outPath, cachePath: join(dir, 'c.json'), storePath: join(dir, 'i.json'), retryPauseMs: 0, env: {}, fetchImpl: async () => { throw new Error('мережі немає'); }, now: NOW, log: () => {} });
   assert.equal(r.written, false);
   assert.equal(await readFile(outPath, 'utf8'), '{"keep":true}');
+});
+
+test('ЗБІРКА: якщо стрічка цього разу відмовила (403), її новини лишаються зі сховища', async () => {
+  const first = await run();
+  const before = byTitle(first.data, 'міст через річку');
+  assert.equal(before.confirmations, 3);
+  const second = await run({}, { failFeeds: ['https://demo.invalid/a.rss'] }, first.dir);
+  const h = Object.fromEntries(second.data.health.map((x) => [x.id, x]));
+  assert.equal(h['d-a'].ok, false, 'стрічку чесно показано як таку, що не відповіла');
+  const after = byTitle(second.data, 'міст через річку');
+  assert.equal(after.confirmations, 3, 'підтвердження не зникло');
+  assert.ok(after.sources.some((x) => x.id === 'd-a'));
+  assert.ok(byTitle(second.data, 'маршрут приміської електрички'), 'новина лише з цієї стрічки теж лишилась');
 });
 
 test('справжній sources.json коректний', async () => {

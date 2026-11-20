@@ -12,7 +12,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const dir = await mkdtemp(join(tmpdir(), 'syto-proto-'));
 await writeFile(join(dir, 'sources.json'), JSON.stringify({ sources: demoSources }));
 const now = Date.now();
-const { data } = await build({ sourcesPath: join(dir, 'sources.json'), outPath: join(dir, 'news.json'), cachePath: join(dir, 'tr.json'),
+const { data } = await build({ sourcesPath: join(dir, 'sources.json'), outPath: join(dir, 'news.json'), cachePath: join(dir, 'tr.json'), storePath: join(dir, 'items.json'), retryPauseMs: 0,
   env: { ANTHROPIC_API_KEY: 'demo' }, fetchImpl: demoFetch(now), now, log: () => {} });
 data.demo = true;
 

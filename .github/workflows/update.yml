@@ -1,0 +1,63 @@
+# Syto — автоматичне оновлення новин і публікація сайту. CoLaba Production
+name: Оновлення новин
+
+on:
+  schedule:
+    - cron: '7,37 * * * *'   # двічі на годину (GitHub може запізнюватися на 5–20 хв)
+  workflow_dispatch:          # кнопка «Run workflow» для ручного запуску
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: syto-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Перевірка коду
+        run: npm test
+      - name: Збір і просіювання новин
+        run: node pipeline/build.mjs
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TRANSLATE_MODEL: ${{ vars.TRANSLATE_MODEL }}
+          TRANSLATE_MAX_NEW: ${{ vars.TRANSLATE_MAX_NEW }}
+      - name: Зберегти кеш перекладів
+        run: |
+          date -u +%F > data/heartbeat.txt
+          git config user.name "syto-bot"
+          git config user.email "syto-bot@users.noreply.github.com"
+          git add data/translations.json data/heartbeat.txt
+          git diff --cached --quiet || (git commit -m "дані: кеш перекладів [skip ci]" && git push)
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  # Публікація — окремим завданням після збірки (так радить документація GitHub):
+  # 20.11 публікація в тому ж завданні не побачила щойно завантажений архів сайту.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

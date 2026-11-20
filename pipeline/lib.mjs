@@ -1,0 +1,262 @@
+// Syto — чисті функції конвеєра (без мережі й диска, щоб їх можна було тестувати).
+// CoLaba Production
+import { XMLParser } from 'fast-xml-parser';
+import { createHash } from 'node:crypto';
+
+export const WINDOW_HOURS = 48;        // новини старші за це не показуємо
+export const CLUSTER_GAP_HOURS = 36;   // максимум між двома повідомленнями про одну подію
+export const SIM_THRESHOLD = 0.5;      // поріг схожості заголовків
+export const PER_FEED_LIMIT = 30;      // беремо не більше N найсвіжіших з кожної стрічки
+export const PER_TAB_LIMIT = 80;
+
+const parser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  textNodeName: '#text',
+  trimValues: true,
+  parseTagValue: false,
+  // Сутності (&amp; &#8217; …) розкодовуємо самі в cleanText/decodeEntities: вбудований
+  // розбір має ліміт 1000 сутностей на документ і падав на великих стрічках (NV, The Guardian).
+  processEntities: false,
+  htmlEntities: false,
+});
+
+const arr = (x) => (x == null ? [] : Array.isArray(x) ? x : [x]);
+
+function text(node) {
+  if (node == null) return '';
+  if (typeof node === 'string') return node;
+  if (typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return text(node[0]);
+  if (typeof node === 'object') return text(node['#text'] ?? node['__cdata'] ?? '');
+  return '';
+}
+
+const NAMED = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', laquo: '«', raquo: '»', mdash: '—', ndash: '–', hellip: '…', rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”' };
+
+export function decodeEntities(s) {
+  return String(s ?? '')
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => safeCp(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => safeCp(parseInt(d, 10)))
+    .replace(/&([a-z]+);/gi, (m, n) => NAMED[n.toLowerCase()] ?? m);
+}
+
+export function cleanText(s, max = 0) {
+  let t = decodeEntities(decodeEntities(String(s ?? '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')))
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')            // теги, що були закодовані сутностями
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (max && t.length > max) {
+    t = t.slice(0, max);
+    const cut = t.lastIndexOf(' ');
+    t = (cut > max * 0.6 ? t.slice(0, cut) : t).replace(/[,;:.\-–—\s]+$/, '') + '…';
+  }
+  return t;
+}
+function safeCp(n) {
+  try { return n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : ' '; } catch { return ' '; }
+}
+
+export function safeUrl(u) {
+  try {
+    const url = new URL(decodeEntities(String(u ?? '')).trim());
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+    return url.toString();
+  } catch { return ''; }
+}
+
+function atomLink(entry) {
+  const links = arr(entry.link);
+  const pick = links.find((l) => typeof l === 'object' && (l['@_rel'] ?? 'alternate') === 'alternate') ?? links[0];
+  if (pick == null) return '';
+  return typeof pick === 'string' ? pick : pick['@_href'] ?? text(pick);
+}
+
+/** Розбирає RSS 2.0, Atom і RDF. Повертає сирі записи {title, link, summary, date}. */
+export function parseFeed(xml) {
+  const doc = parser.parse(String(xml));
+  let raw = [];
+  if (doc?.rss?.channel) {
+    raw = arr(doc.rss.channel.item).map((i) => ({
+      title: text(i.title), link: text(i.link) || text(i.guid),
+      summary: text(i.description), date: text(i.pubDate) || text(i['dc:date']),
+    }));
+  } else if (doc?.feed) {
+    raw = arr(doc.feed.entry).map((e) => ({
+      title: text(e.title), link: atomLink(e),
+      summary: text(e.summary) || text(e.content), date: text(e.published) || text(e.updated),
+    }));
+  } else if (doc?.['rdf:RDF']) {
+    raw = arr(doc['rdf:RDF'].item).map((i) => ({
+      title: text(i.title), link: text(i.link),
+      summary: text(i.description), date: text(i['dc:date']) || text(i.pubDate),
+    }));
+  } else {
+    throw new Error('Невідомий формат стрічки (не RSS/Atom/RDF)');
+  }
+  return raw;
+}
+
+/** Нормалізує записи однієї стрічки: чистить, відкидає биті, старі й із майбутнього. */
+export function normalizeItems(raw, source, now = Date.now()) {
+  const out = [];
+  let dropped = 0;
+  for (const r of raw) {
+    const title = cleanText(r.title, 220);
+    const url = safeUrl(r.link);
+    const ts = Date.parse(r.date);
+    const age = (now - ts) / 3600e3;
+    if (!title || title.length < 8 || !url || !Number.isFinite(ts) || age > WINDOW_HOURS || age < -1) { dropped++; continue; }
+    out.push({
+      id: createHash('sha1').update(url).digest('hex').slice(0, 12),
+      title, url, ts: Math.min(ts, now),
+      summary: cleanText(r.summary, 240),
+      src: source.id, lang: source.lang,
+    });
+  }
+  out.sort((a, b) => b.ts - a.ts);
+  return { items: out.slice(0, PER_FEED_LIMIT), dropped };
+}
+
+// ---------- схожість заголовків ----------
+const STOP = new Set(('і й та в у на з із зі до по за від для про що як це не але чи або а при під над між через після перед також вже ще буде були було був є його її їх який яка які яке ' +
+  'и в во на с со к по за от для о об что как это не но или а при под над между через после перед также уже еще будет были было был его ее их который которая которые ' +
+  'the a an of in on at to for and or but is are was were be been has have had with by from as that this it its not after before over into than says said say new').split(' '));
+
+export function stems(title) {
+  const words = String(title).toLowerCase().replace(/[’'`ʼ]/g, '').split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  const set = new Set();
+  for (const w of words) {
+    if (STOP.has(w)) continue;
+    if (/^\d+$/.test(w)) { set.add(w); continue; }
+    if (w.length < 3) continue;
+    set.add(w.length > 5 ? w.slice(0, 5) : w);
+  }
+  return set;
+}
+
+export function similarity(a, b) {
+  if (!a.size || !b.size) return 0;
+  let inter = 0;
+  for (const x of a) if (b.has(x)) inter++;
+  return inter / (a.size + b.size - inter);
+}
+
+// ---------- крикливі заголовки ----------
+const CLICKBAIT = [
+  /шок(?:ува|ую|ова|\b)/i, /сенсаці/i, /ви не повірите/i, /вы не поверите/i, /терміново[!:]/i, /срочно[!:]/i,
+  /!{2,}/, /\?!/, /ось що (?:сталося|буде)/i, /вот что (?:случилось|будет)/i, /you won'?t believe/i, /shocking/i,
+  /цього ніхто не чекав/i, /розірвал[аио] мережу/i, /взорвал[аио]? сеть/i,
+];
+export function isClickbait(title) {
+  const t = String(title);
+  if (CLICKBAIT.some((re) => re.test(t))) return true;
+  const letters = t.replace(/[^\p{L}]/gu, '');
+  const upper = letters.replace(/[^\p{Lu}]/gu, '');
+  return letters.length >= 20 && upper.length / letters.length > 0.6;
+}
+
+// ---------- технології та ШІ ----------
+const B = '(?<![\\p{L}\\p{N}])', E = '(?![\\p{L}\\p{N}])';
+const TECH_RE = new RegExp(
+  '(?:штучн\\S* інтелект|искусственн\\S* интеллект|artificial intelligence|нейромереж|нейросет|chatgpt|openai|anthropic|deepmind|nvidia|' +
+  'чат-?бот|chatbot|робототехн|humanoid|квантов|quantum|semiconductor|напівпровідник|полупроводник|кібер|cyber|стартап|startup|' +
+  B + '(?:ШІ|ИИ|AI|LLM|claude|gemini|robots?|чип(?:и|ів|ов|а)?)' + E + ')', 'iu');
+export const isTech = (title) => TECH_RE.test(String(title));
+
+// ---------- кластеризація ----------
+const INDEPENDENT_TYPES = new Set(['independent', 'public', 'exile']);
+
+/**
+ * Групує повідомлення про одну подію. items мають поле cmp — заголовок для порівняння
+ * (український переклад, якщо він є, інакше оригінал).
+ */
+export function clusterItems(items) {
+  const sorted = [...items].sort((a, b) => a.ts - b.ts);
+  const clusters = [];
+  for (const it of sorted) {
+    const st = stems(it.cmp ?? it.title);
+    let best = null, bestSim = 0;
+    for (const c of clusters) {
+      if (it.ts - c.lastTs > CLUSTER_GAP_HOURS * 3600e3) continue;
+      if (c.members.some((m) => m.item.src === it.src)) continue; // одне джерело не підтверджує саме себе
+      let s = 0;
+      for (const m of c.members) s = Math.max(s, similarity(st, m.st));
+      if (s > bestSim) { bestSim = s; best = c; }
+    }
+    if (best && bestSim >= SIM_THRESHOLD) {
+      best.members.push({ item: it, st });
+      best.lastTs = Math.max(best.lastTs, it.ts);
+    } else {
+      clusters.push({ members: [{ item: it, st }], lastTs: it.ts });
+    }
+  }
+  return clusters.map((c) => c.members.map((m) => m.item));
+}
+
+/** Перетворює групу повідомлень на картку новини зі статусом підтвердження та оцінкою. */
+export function buildStory(members, srcMap, now = Date.now()) {
+  const withSrc = members.map((m) => ({ ...m, source: srcMap.get(m.src) })).filter((m) => m.source);
+  // головне повідомлення: спершу незалежні, потім вищий рівень довіри, потім українською, потім раніше
+  const lead = [...withSrc].sort((a, b) =>
+    (INDEPENDENT_TYPES.has(b.source.type) - INDEPENDENT_TYPES.has(a.source.type)) ||
+    (b.source.trust - a.source.trust) ||
+    ((b.lang === 'uk') - (a.lang === 'uk')) ||
+    (a.ts - b.ts))[0];
+  const independent = new Set(withSrc.filter((m) => INDEPENDENT_TYPES.has(m.source.type)).map((m) => m.src));
+  const stateOnly = independent.size === 0;
+  const status = stateOnly ? 'state' : independent.size >= 2 ? 'confirmed' : 'single';
+  const firstTs = Math.min(...withSrc.map((m) => m.ts));
+  const lastTs = Math.max(...withSrc.map((m) => m.ts));
+  const title = lead.titleUk || lead.title;
+  const clickbait = isClickbait(lead.title);
+  const cats = new Set(withSrc.map((m) => m.source.cat));
+  if (withSrc.some((m) => isTech(m.title) || (m.titleUk && isTech(m.titleUk)))) cats.add('tech');
+  const ageH = Math.max(0, (now - lastTs) / 3600e3);
+  const trustMax = Math.max(...withSrc.map((m) => m.source.trust));
+  const score = Math.round(
+    (status === 'confirmed' ? 30 + 8 * (Math.min(independent.size, 5) - 2) : 0) +
+    trustMax * 5 - ageH * 1.5 - (clickbait ? 15 : 0) - (stateOnly ? 10 : 0));
+  return {
+    id: lead.id, title,
+    summary: lead.lang === 'uk' ? lead.summary : (lead.summaryUk || ''),
+    url: lead.url, ts: firstTs, lastTs,
+    status, confirmations: independent.size, clickbait,
+    translated: !!lead.titleUk,
+    cats: [...cats], score,
+    sources: withSrc.sort((a, b) => a.ts - b.ts).map((m) => ({
+      id: m.src, name: m.source.name, type: m.source.type, lang: m.lang,
+      url: m.url, title: m.title, ts: m.ts,
+    })),
+  };
+}
+
+export function assemble(items, sources, now = Date.now()) {
+  const srcMap = new Map(sources.map((s) => [s.id, s]));
+  const facts = items.filter((i) => srcMap.get(i.src)?.type === 'factcheck');
+  const news = items.filter((i) => srcMap.get(i.src) && srcMap.get(i.src).type !== 'factcheck');
+  const stories = clusterItems(news).map((g) => buildStory(g, srcMap, now));
+  stories.sort((a, b) => b.score - a.score || b.lastTs - a.lastTs);
+  const tabs = { ukraine: [], world: [], tech: [], fakes: [] };
+  for (const s of stories) {
+    for (const c of ['ukraine', 'world', 'tech']) {
+      if (s.cats.includes(c) && tabs[c].length < PER_TAB_LIMIT) tabs[c].push(s.id);
+    }
+  }
+  const fakeStories = facts.sort((a, b) => b.ts - a.ts).slice(0, PER_TAB_LIMIT).map((f) => {
+    const s = srcMap.get(f.src);
+    return {
+      id: f.id, title: f.titleUk || f.title, summary: f.summary, url: f.url, ts: f.ts, lastTs: f.ts,
+      status: 'factcheck', confirmations: 0, clickbait: false, translated: !!f.titleUk, cats: ['fakes'], score: 0,
+      sources: [{ id: s.id, name: s.name, type: s.type, lang: f.lang, url: f.url, title: f.title, ts: f.ts }],
+    };
+  });
+  tabs.fakes = fakeStories.map((f) => f.id);
+  const used = new Set([...tabs.ukraine, ...tabs.world, ...tabs.tech]);
+  return { tabs, stories: [...stories.filter((s) => used.has(s.id)), ...fakeStories] };
+}

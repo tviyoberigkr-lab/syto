@@ -1,0 +1,82 @@
+/* Syto — CoLaba Production */
+:root{
+  --bg:#f3f0e8; --card:#fffdf8; --ink:#1a1c20; --muted:#62666e; --line:#e0dacb; --accent:#0b4f9e; --top:#0b3a6f; --top-ink:#fff;
+  --ok:#14603a; --ok-bg:#e1f0e6; --one:#7a5600; --one-bg:#f6ecd0; --st:#643a88; --st-bg:#eee4f6; --fc:#a02c1c; --fc-bg:#f8e2dd; --loud:#8a3b00; --loud-bg:#fbe7d3;
+  --serif: Georgia, "Times New Roman", "Noto Serif", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#111317; --card:#1a1d23; --ink:#eceae4; --muted:#a0a4ac; --line:#2c3038; --accent:#8ab8f5; --top:#0d2238; --top-ink:#f2f4f8;
+    --ok:#7fd3a2; --ok-bg:#16301f; --one:#e6c66a; --one-bg:#332a10; --st:#cfa9ee; --st-bg:#2b1f38; --fc:#f29a8b; --fc-bg:#3a1a15; --loud:#f0b27a; --loud-bg:#38230f; }
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--sans);padding-bottom:calc(68px + env(safe-area-inset-bottom))}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+.top{position:sticky;top:0;z-index:5;background:var(--top);color:var(--top-ink);display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:calc(10px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left))}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{width:34px;height:34px;flex:none;color:#ffd24a}
+h1{font:700 22px/1 var(--serif);margin:0;letter-spacing:.3px}
+.tagline{margin:3px 0 0;font-size:12px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.refresh{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);color:inherit;border:0;border-radius:999px;padding:8px 12px;font:inherit;font-size:13px;min-height:44px;cursor:pointer;white-space:nowrap}
+.refresh svg{width:18px;height:18px}
+.refresh.busy svg{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.refresh.busy svg{animation:none}}
+.notice{margin:0;padding:10px 16px;background:var(--one-bg);color:var(--one);font-size:14px;border-bottom:1px solid var(--line)}
+main{max-width:720px;margin:0 auto;padding:0 12px}
+main:focus{outline:none}
+.viewhead{padding:16px 4px 6px}
+h2{font:700 24px/1.2 var(--serif);margin:0}
+.hint{margin:4px 0 12px;color:var(--muted);font-size:14px}
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 14px;font:inherit;font-size:14px;min-height:44px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.list{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 14px 6px}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;border-radius:6px;padding:3px 8px;line-height:1.4}
+.b-confirmed{color:var(--ok);background:var(--ok-bg)} .b-single{color:var(--one);background:var(--one-bg)}
+.b-state{color:var(--st);background:var(--st-bg)} .b-factcheck{color:var(--fc);background:var(--fc-bg)} .b-loud{color:var(--loud);background:var(--loud-bg)}
+.card h3{font:700 18.5px/1.3 var(--serif);margin:0;overflow-wrap:anywhere}
+.card h3 a{color:inherit;text-decoration:none}
+.card h3 a:hover{text-decoration:underline}
+.sum{margin:6px 0 0;color:var(--muted);font-size:14.5px;overflow-wrap:anywhere}
+.meta{margin:8px 0 0;color:var(--muted);font-size:13px}
+details{margin-top:6px;border-top:1px solid var(--line)}
+summary{list-style:none;cursor:pointer;padding:11px 0;font-size:14px;font-weight:600;color:var(--accent);min-height:44px;display:flex;align-items:center;justify-content:space-between}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"▾";font-size:14px}
+details[open] summary::after{content:"▴"}
+.srcs{list-style:none;margin:0;padding:0 0 8px;display:grid;gap:10px}
+.srcs li{font-size:14px;overflow-wrap:anywhere}
+.srcs .who{display:block;font-weight:600}
+.srcs .kind{font-weight:400;color:var(--muted);font-size:12.5px}
+.srcs a{display:block;padding:3px 0}
+.empty{text-align:center;color:var(--muted);padding:40px 16px}
+.foot{color:var(--muted);font-size:12.5px;text-align:center;padding:26px 8px 18px}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+.tabs a{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px 7px;color:var(--muted);text-decoration:none;font-size:11px;line-height:1.2;text-align:center;min-height:60px;justify-content:center}
+.tabs svg{width:24px;height:24px}
+.tabs a[aria-current="page"]{color:var(--accent);font-weight:700}
+/* Як це працює */
+.method{padding:16px 4px}
+.method h3{font:700 18px/1.3 var(--serif);margin:22px 0 6px}
+.method p,.method li{font-size:15px}
+.method ol,.method ul{padding-left:20px;margin:6px 0}
+.legend{list-style:none;padding:0!important;display:grid;gap:10px}
+.legend li{display:grid;gap:3px}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.stat div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.stat b{display:block;font:700 22px/1.1 var(--serif)}
+.stat span{font-size:12px;color:var(--muted)}
+.srctable{list-style:none;padding:0!important;margin:8px 0;display:grid;gap:6px}
+.srctable li{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px}
+.dot{width:10px;height:10px;border-radius:50%;margin-top:7px;flex:none;background:var(--ok)}
+.dot.bad{background:var(--fc)}
+.srctable small{display:block;color:var(--muted);font-size:12.5px}
+.group{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:16px 0 4px}
+@media (min-width:760px){ body{font-size:17px} .card h3{font-size:20px} .tabs a{flex-direction:row;gap:8px;font-size:14px} }

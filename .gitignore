@@ -1,0 +1,6 @@
+node_modules/
+site/data/news.json
+prototype/
+tests/shot-*.png
+Project status/
+workflow_update.yml

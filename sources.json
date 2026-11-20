@@ -1,0 +1,45 @@
+{
+  "_comment": "Список джерел. type: independent | public (суспільний мовник) | state (державне ЗМІ) | exile (незалежне ЗМІ у вигнанні) | factcheck. trust 1-3. Державні ЗМІ не зараховуються як незалежне підтвердження. Щоб вимкнути джерело — постав \"enabled\": false.",
+  "sources": [
+    {"id": "suspilne", "name": "Суспільне Новини", "feed": "https://suspilne.media/rss/all.rss", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "public", "trust": 3},
+    {"id": "pravda", "name": "Українська правда", "feed": "https://www.pravda.com.ua/rss/view_news/", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
+    {"id": "liga", "name": "LIGA.net", "feed": "https://news.liga.net/ua/all/rss.xml", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
+    {"id": "nv", "name": "NV", "feed": "https://nv.ua/ukr/rss/all.xml", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
+    {"id": "zn", "name": "Дзеркало тижня", "feed": "https://zn.ua/ukr/rss/full.rss", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
+    {"id": "hromadske", "name": "hromadske", "enabled": false, "note": "20.11.2026: власної RSS-стрічки немає, з GitHub 404", "feed": "https://hromadske.ua/feed", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
+    {"id": "babel", "name": "Бабель", "enabled": false, "note": "20.11.2026: адреса RSS дає 404 з GitHub, чинну не знайдено", "feed": "https://babel.ua/rss", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
+    {"id": "svoboda", "name": "Радіо Свобода", "feed": "https://www.radiosvoboda.org/api/zrqiteuuir", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
+    {"id": "eurointegration", "name": "Європейська правда", "feed": "https://www.eurointegration.com.ua/rss/view_news/", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
+    {"id": "epravda", "name": "Економічна правда", "feed": "https://www.epravda.com.ua/rss/view_news/", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
+    {"id": "ukrinform", "name": "Укрінформ", "feed": "https://www.ukrinform.ua/rss/block-lastnews", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "state", "trust": 2},
+    {"id": "bbc-uk", "name": "BBC News Україна", "feed": "https://feeds.bbci.co.uk/ukrainian/rss.xml", "lang": "uk", "country": "GB", "cat": "ukraine", "type": "public", "trust": 3},
+    {"id": "dw-uk", "name": "DW українською", "feed": "https://rss.dw.com/rdf/rss-ukr-all", "lang": "uk", "country": "DE", "cat": "world", "type": "public", "trust": 3},
+
+    {"id": "bbc-world", "name": "BBC News", "feed": "https://feeds.bbci.co.uk/news/world/rss.xml", "lang": "en", "country": "GB", "cat": "world", "type": "public", "trust": 3},
+    {"id": "nyt-world", "name": "The New York Times", "feed": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml", "lang": "en", "country": "US", "cat": "world", "type": "independent", "trust": 3},
+    {"id": "times", "name": "The Times", "enabled": false, "note": "20.11.2026: за адресою не RSS-стрічка, чинну не знайдено", "feed": "https://www.thetimes.com/world/rss", "lang": "en", "country": "GB", "cat": "world", "type": "independent", "trust": 3},
+    {"id": "guardian", "name": "The Guardian", "feed": "https://www.theguardian.com/world/rss", "lang": "en", "country": "GB", "cat": "world", "type": "independent", "trust": 3},
+
+    {"id": "meduza", "name": "Meduza", "feed": "https://meduza.io/rss/all", "lang": "ru", "country": "RU", "cat": "world", "type": "exile", "trust": 2},
+    {"id": "theins", "name": "The Insider", "feed": "https://theins.ru/feed", "lang": "ru", "country": "RU", "cat": "world", "type": "exile", "trust": 2},
+    {"id": "zona", "name": "Медиазона", "feed": "https://zona.media/rss", "lang": "ru", "country": "RU", "cat": "world", "type": "exile", "trust": 2},
+    {"id": "novaya-eu", "name": "Новая газета Европа", "feed": "https://novayagazeta.eu/feed/rss", "lang": "ru", "country": "RU", "cat": "world", "type": "exile", "trust": 2},
+
+    {"id": "scmp-china", "name": "South China Morning Post", "feed": "https://www.scmp.com/rss/4/feed", "lang": "en", "country": "CN", "cat": "world", "type": "independent", "trust": 2},
+    {"id": "caixin", "name": "Caixin Global", "feed": "https://www.caixinglobal.com/rss", "lang": "en", "country": "CN", "cat": "world", "type": "independent", "trust": 2},
+    {"id": "xinhua", "name": "Сіньхуа (Xinhua)", "feed": "http://www.xinhuanet.com/english/rss/worldrss.xml", "lang": "en", "country": "CN", "cat": "world", "type": "state", "trust": 1},
+
+    {"id": "bbc-tech", "name": "BBC Technology", "feed": "https://feeds.bbci.co.uk/news/technology/rss.xml", "lang": "en", "country": "GB", "cat": "tech", "type": "public", "trust": 3},
+    {"id": "nyt-tech", "name": "NYT Technology", "feed": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 3},
+    {"id": "mit-tr", "name": "MIT Technology Review", "feed": "https://www.technologyreview.com/feed/", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 3},
+    {"id": "verge-ai", "name": "The Verge — AI", "feed": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 2},
+    {"id": "ars", "name": "Ars Technica", "feed": "https://feeds.arstechnica.com/arstechnica/index", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 3},
+    {"id": "tc-ai", "name": "TechCrunch — AI", "feed": "https://techcrunch.com/category/artificial-intelligence/feed/", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 2},
+    {"id": "scmp-tech", "name": "SCMP Tech", "feed": "https://www.scmp.com/rss/36/feed", "lang": "en", "country": "CN", "cat": "tech", "type": "independent", "trust": 2},
+    {"id": "ain", "name": "AIN.UA", "feed": "https://ain.ua/feed/", "lang": "uk", "country": "UA", "cat": "tech", "type": "independent", "trust": 2},
+
+    {"id": "stopfake", "name": "StopFake", "feed": "https://www.stopfake.org/uk/feed/", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 3},
+    {"id": "voxcheck", "name": "VoxCheck", "feed": "https://voxukraine.org/category/voxcheck/feed", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 3},
+    {"id": "behindthenews", "name": "По той бік новин", "enabled": false, "note": "20.11.2026: адреса RSS дає 404 з GitHub, чинну не знайдено", "feed": "https://behindthenews.ua/feed/", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 3}
+  ]
+}

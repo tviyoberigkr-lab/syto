@@ -25,7 +25,7 @@
     {"id": "economist", "name": "The Economist", "feed": "https://www.economist.com/international/rss.xml", "lang": "en", "country": "GB", "cat": "world", "type": "independent", "trust": 3},
     {"id": "spiegel-intl", "name": "Der Spiegel International", "feed": "https://www.spiegel.de/international/index.rss", "lang": "en", "country": "DE", "cat": "world", "type": "independent", "trust": 3},
     {"id": "npr-world", "name": "NPR — National Public Radio", "feed": "https://feeds.npr.org/1004/rss.xml", "lang": "en", "country": "US", "cat": "world", "type": "public", "trust": 3},
-    {"id": "cbc-world", "name": "CBC News (Канада)", "feed": "https://rss.cbc.ca/lineup/world.xml", "lang": "en", "country": "CA", "cat": "world", "type": "public", "trust": 3},
+    {"id": "cbc-world", "enabled": false, "note": "21.11.2026: сервер CBC не відповідає на запити з GitHub (тайм-аут, обидві адреси)", "name": "CBC News (Канада)", "feed": "https://rss.cbc.ca/lineup/world.xml", "lang": "en", "country": "CA", "cat": "world", "type": "public", "trust": 3},
     {"id": "nhk-world", "enabled": false, "note": "21.11.2026: відкритої англомовної RSS у NHK World не знайдено; японська стрічка не дала придатних записів", "name": "NHK World-Japan", "feed": "https://www3.nhk.or.jp/rss/news/cat6.xml", "lang": "en", "country": "JP", "cat": "world", "type": "public", "trust": 3},
     {"id": "notes-poland", "name": "Notes from Poland", "feed": "https://notesfrompoland.com/feed/", "lang": "en", "country": "PL", "cat": "world", "type": "independent", "trust": 2},
     {"id": "aljazeera", "name": "Al Jazeera English (фінансує держава Катар)", "feed": "https://www.aljazeera.com/xml/rss/all.xml", "lang": "en", "country": "QA", "cat": "world", "type": "state", "trust": 2},

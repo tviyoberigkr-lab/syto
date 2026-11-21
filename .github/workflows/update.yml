@@ -3,9 +3,12 @@ name: Оновлення новин
 
 on:
   schedule:
-    # Свіжий випуск до 8:00, 12:00, 16:00 і 20:00 за Києвом узимку. Запуск за 10 хв до години,
-    # бо GitHub запізнюється на 5–20 хв. Час тут у UTC; улітку виходить на годину пізніше.
-    - cron: '50 5,9,13,17 * * *'
+    # Свіжий випуск до 8:00, 12:00, 16:00 і 20:00 за Києвом узимку (час тут у UTC; улітку — на годину пізніше).
+    # GitHub може пропустити запуск за розкладом без жодної помилки (21.11 о 8:00 так і сталося),
+    # тому на кожен випуск — 4 спроби: за 37, 19 і 7 хв до години та через 17 хв після.
+    # Спроба, яка бачить свіжий випуск (молодший за 50 хв), одразу завершується: нічого не перекладає і не публікує.
+    - cron: '23,41,53 5,9,13,17 * * *'
+    - cron: '17 6,10,14,18 * * *'
   workflow_dispatch:          # кнопка «Run workflow» для ручного запуску
   push:
     branches: [main]
@@ -23,22 +26,44 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write   # лише щоб зберегти кеш перекладів у репозиторій
+    outputs:
+      skip: ${{ steps.fresh.outputs.skip }}
     steps:
+      # Лише для запусків за розкладом: якщо попередня спроба вже зробила свіжий випуск — зупиняємось.
+      # Ручні запуски й зміни коду збираються завжди. Якщо сайт не відповів — збираємо (краще зайвий випуск, ніж пропущений).
+      - name: Чи потрібен цей випуск
+        id: fresh
+        run: |
+          skip=false
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            gen=$(curl -fsS --max-time 20 "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data/news.json" \
+                  | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{console.log(Date.parse(JSON.parse(d).generatedAt)||0)}catch{console.log(0)}})" || echo 0)
+            age=$(( ( $(date +%s%3N) - gen ) / 60000 ))
+            if [ "$gen" = "0" ]; then echo "Не вдалося прочитати попередній випуск — збираємо."; else echo "Попередній випуск: $age хв тому"; fi
+            if [ "$gen" != "0" ] && [ "$age" -ge 0 ] && [ "$age" -lt 50 ]; then skip=true; echo "Свіжий випуск уже є — цю спробу пропускаємо."; fi
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v5
+        if: steps.fresh.outputs.skip != 'true'
       - uses: actions/setup-node@v4
+        if: steps.fresh.outputs.skip != 'true'
         with:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts   # сторонні пакети не виконують свій код під час встановлення
+        if: steps.fresh.outputs.skip != 'true'
       # Сховище повідомлень за 48 год живе в кеші Actions (не в історії репозиторію).
       - uses: actions/cache@v4
+        if: steps.fresh.outputs.skip != 'true'
         with:
           path: data/items.json
           key: syto-items-${{ github.run_id }}
           restore-keys: syto-items-
       - name: Перевірка коду
+        if: steps.fresh.outputs.skip != 'true'
         run: npm test
       - name: Збір і просіювання новин
+        if: steps.fresh.outputs.skip != 'true'
         run: node pipeline/build.mjs
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -47,6 +72,7 @@ jobs:
           # Щоб зупинити нові переклади (витрати), постав тут '0': уже перекладене береться з кешу безкоштовно.
           TRANSLATE_MAX_NEW: ${{ vars.TRANSLATE_MAX_NEW }}
       - name: Зберегти кеш перекладів
+        if: steps.fresh.outputs.skip != 'true'
         run: |
           date -u +%F > data/heartbeat.txt
           git config user.name "syto-bot"
@@ -54,7 +80,9 @@ jobs:
           git add data/translations.json data/heartbeat.txt
           git diff --cached --quiet || (git commit -m "дані: кеш перекладів [skip ci]" && git push)
       - uses: actions/configure-pages@v5
+        if: steps.fresh.outputs.skip != 'true'
       - uses: actions/upload-pages-artifact@v4
+        if: steps.fresh.outputs.skip != 'true'
         with:
           path: site
 
@@ -62,6 +90,7 @@ jobs:
   # 20.11 публікація в тому ж завданні не побачила щойно завантажений архів сайту.
   deploy:
     needs: build
+    if: needs.build.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

@@ -407,3 +407,13 @@ test('cleanText прибирає рекламні вставки видань', 
   const raw = 'Former officer pleaded not guilty Get our breaking news email , free app or daily news podcast Beau knew he had murdered';
   assert.equal(cleanText(raw), 'Former officer pleaded not guilty Beau knew he had murdered');
 });
+
+test('Sonnet 5.5: замість «disabled» надсилається between_tools (без міркувань)', async () => {
+  let body;
+  const fetchImpl = async (url, opts) => { body = JSON.parse(opts.body); return new Response(JSON.stringify({ content: [{ type: 'text', text: '["Переклад одного заголовка про погоду"]' }], usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200 }); };
+  const provider = pickProvider({ ANTHROPIC_API_KEY: 'k', TRANSLATE_MODEL: 'claude-sonnet-5-5' });
+  await translateItems([{ id: 'z', src: 'a', lang: 'en', title: 'One single headline about the weather', summary: '' }], {}, { provider, fetchImpl, now: NOW });
+  assert.equal(body.model, 'claude-sonnet-5-5');
+  assert.deepEqual(body.thinking, { type: 'between_tools' });
+  assert.ok(body.max_tokens <= 600);
+});

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cleanText, safeUrl, parseFeed, normalizeItems, stems, similarity, isClickbait, isTech, clusterItems } from '../pipeline/lib.mjs';
+import { cleanText, safeUrl, parseFeed, normalizeItems, stems, similarity, isClickbait, isTech, clusterItems, buildStory } from '../pipeline/lib.mjs';
 import { parseReply, parseEntries, pickProvider, translateItems, plausible } from '../pipeline/translate.mjs';
 import { build } from '../pipeline/build.mjs';
 import { demoSources, demoFetch } from '../tools/demo_feeds.mjs';
@@ -368,6 +368,21 @@ test('БЕЗПЕКА: зіпсований кеш перекладів не ва
   assert.equal(items[0].titleUk, undefined);
 });
 
+test('видання однієї редакційної групи не підтверджують одне одного', () => {
+  const srcMap = new Map([
+    ['pravda', { id: 'pravda', name: 'УП', type: 'independent', trust: 3, cat: 'ukraine', group: 'up' }],
+    ['euro', { id: 'euro', name: 'ЄП', type: 'independent', trust: 3, cat: 'ukraine', group: 'up' }],
+    ['nv', { id: 'nv', name: 'NV', type: 'independent', trust: 3, cat: 'ukraine' }],
+  ]);
+  const m = (id, src) => ({ id, src, title: 'Подія', lang: 'uk', url: 'https://e.org/' + id, ts: NOW, summary: '' });
+  const two = buildStory([m('1', 'pravda'), m('2', 'euro')], srcMap, NOW);
+  assert.equal(two.status, 'single', 'УП + ЄП — одне джерело');
+  assert.equal(two.confirmations, 1);
+  const three = buildStory([m('1', 'pravda'), m('2', 'euro'), m('3', 'nv')], srcMap, NOW);
+  assert.equal(three.status, 'confirmed');
+  assert.equal(three.confirmations, 2);
+});
+
 test('справжній sources.json коректний', async () => {
   const { sources } = JSON.parse(await readFile(new URL('../sources.json', import.meta.url), 'utf8'));
   const ids = new Set();
@@ -378,5 +393,6 @@ test('справжній sources.json коректний', async () => {
     assert.ok(['ukraine', 'world', 'tech', 'fakes'].includes(s.cat));
     assert.ok(['uk', 'en', 'ru'].includes(s.lang));
     assert.ok(s.trust >= 1 && s.trust <= 3);
+    if (s.group !== undefined) assert.match(s.group, /^[a-z0-9-]+$/);
   }
 });

@@ -237,7 +237,8 @@ export function buildStory(members, srcMap, now = Date.now()) {
     (b.source.trust - a.source.trust) ||
     ((b.lang === 'uk') - (a.lang === 'uk')) ||
     (a.ts - b.ts))[0];
-  const independent = new Set(withSrc.filter((m) => INDEPENDENT_TYPES.has(m.source.type)).map((m) => m.src));
+  // Підтвердження рахуються за редакційними групами: «Українська правда» + «Європейська правда» — це одне джерело, не два.
+  const independent = new Set(withSrc.filter((m) => INDEPENDENT_TYPES.has(m.source.type)).map((m) => m.source.group || m.src));
   const stateOnly = independent.size === 0;
   const status = stateOnly ? 'state' : independent.size >= 2 ? 'confirmed' : 'single';
   const firstTs = Math.min(...withSrc.map((m) => m.ts));

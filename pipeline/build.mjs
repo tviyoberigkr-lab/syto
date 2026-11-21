@@ -81,7 +81,7 @@ export async function build({
   const data = {
     generatedAt: new Date(now).toISOString(),
     stats: { feedsOk: okFeeds, feedsTotal: sources.length, items: items.length, stories: stories.length, translation: { provider: tr.provider, translated: tr.translated, fromCache: tr.fromCache, failed: tr.failed, pending: tr.skipped } },
-    sources: sources.map(({ id, name, type, lang, country, cat, trust }) => ({ id, name, type, lang, country, cat, trust })),
+    sources: sources.map(({ id, name, type, lang, country, cat, trust, group }) => ({ id, name, type, lang, country, cat, trust, ...(group ? { group } : {}) })),
     health, tabs, stories,
   };
 

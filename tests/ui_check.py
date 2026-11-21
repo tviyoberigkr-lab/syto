@@ -10,6 +10,14 @@ def check(cond, msg):
     print(('  ok   ' if cond else '  FAIL ') + msg)
     if not cond: fails.append(msg)
 
+async def wait_title(page, head, timeout=8.0):
+    # Без page.wait_for_function: політика безпеки вмісту сайту забороняє eval, і це правильно.
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        if await page.locator('#view-title').inner_text() == head: return
+        await page.wait_for_timeout(50)
+    raise AssertionError(f'заголовок вкладки не став «{head}»')
+
 async def main():
     subprocess.run(['node', 'tools/make_prototype.mjs'], cwd=ROOT, check=True, capture_output=True)
     tmp = tempfile.mkdtemp()
@@ -53,13 +61,13 @@ async def main():
                 check(all(h and h.startswith('http') and t == '_blank' and 'noopener' in r for h, t, r in links), f'усі {len(links)} посилань — http(s), у новій вкладці, noopener')
                 for tab, must, head in [('world', 'підводн', 'Світ'), ('tech', 'ШІ', 'Технології та ШІ'), ('fakes', 'Спростування', 'Фейки')]:
                     await page.click(f'.tabs a[data-tab="{tab}"]')
-                    await page.wait_for_function(f"document.getElementById('view-title').textContent === '{head}'")
+                    await wait_title(page, head)
                     txt = await page.locator('#feed-view').inner_text()
                     check(must in txt and await page.locator('.card').count() > 0, f'вкладка {tab} показує свої новини')
                 check(await page.locator('#filters').is_hidden(), 'у «Фейках» фільтр приховано')
                 # терміни з поясненнями (демо-новина у вкладці «Технології та ШІ»)
                 await page.click('.tabs a[data-tab="tech"]')
-                await page.wait_for_function("document.getElementById('view-title').textContent === 'Технології та ШІ'")
+                await wait_title(page, 'Технології та ШІ')
                 terms = page.locator('.card .term')
                 check(await terms.count() >= 2, f'сині слова-терміни є ({await terms.count()})')
                 tt = await terms.first.inner_text()

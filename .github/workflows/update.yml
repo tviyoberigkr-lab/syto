@@ -10,10 +10,8 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write
-  pages: write
-  id-token: write
+# Права — мінімальні й окремо для кожного завдання (аудит безпеки 21.11).
+permissions: {}
 
 concurrency:
   group: syto-pages
@@ -23,13 +21,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write   # лише щоб зберегти кеш перекладів у репозиторій
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts   # сторонні пакети не виконують свій код під час встановлення
       # Сховище повідомлень за 48 год живе в кеші Actions (не в історії репозиторію).
       - uses: actions/cache@v4
         with:
@@ -64,6 +64,9 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      pages: write      # публікація сайту
+      id-token: write   # підтвердження, що публікує саме цей репозиторій
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}

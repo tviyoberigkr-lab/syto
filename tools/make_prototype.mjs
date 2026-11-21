@@ -24,6 +24,7 @@ html = html
   .replace(/<link rel="manifest"[^>]*>\n?/, '').replace(/<link rel="icon"[^>]*>\n?/, '').replace(/<link rel="apple-touch-icon"[^>]*>\n?/, '')
   .replace('<link rel="stylesheet" href="styles.css">', () => `<style>\n${css}</style>`)
   .replace('<script src="app.js"></script>', () => `<script>window.__SYTO_DATA__ = ${json};</script>\n<script>\n${js}</script>`)
+  .replace(/<meta http-equiv="Content-Security-Policy"[^>]*>\n?/, '') // прототип — один файл із вбудованим кодом, політика його заблокує
   .replace('<title>Syto — новини без шуму</title>', '<title>Syto — прототип</title>');
 await mkdir(join(ROOT, 'prototype'), { recursive: true });
 await writeFile(join(ROOT, 'prototype/syto-prototype.html'), html);

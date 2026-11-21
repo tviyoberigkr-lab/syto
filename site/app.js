@@ -130,6 +130,7 @@
     if (!box) return;
     btn.setAttribute('aria-expanded', 'true');
     box.textContent = btn.getAttribute('data-expl');
+    box.appendChild(el('span', 'gloss-note', 'Пояснення ШІ — може бути неточним'));
     box.hidden = false;
   }
 
@@ -323,7 +324,7 @@
 
   function route() {
     var h = (location.hash || '').replace('#', '');
-    state.tab = TABS[h] ? h : 'ukraine';
+    state.tab = Object.prototype.hasOwnProperty.call(TABS, h) ? h : 'ukraine';
     render();
     window.scrollTo(0, 0);
   }

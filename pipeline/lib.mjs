@@ -7,6 +7,7 @@ export const WINDOW_HOURS = 48;        // новини старші за це н
 export const CLUSTER_GAP_HOURS = 36;   // максимум між двома повідомленнями про одну подію
 export const SIM_THRESHOLD = 0.5;      // поріг схожості заголовків
 export const PER_FEED_LIMIT = 30;      // беремо не більше N найсвіжіших з кожної стрічки
+export const MAX_RAW_ITEMS = 300;      // більше сирих записів з однієї стрічки не розбираємо
 export const PER_TAB_LIMIT = 80;
 
 const parser = new XMLParser({
@@ -41,16 +42,30 @@ export function decodeEntities(s) {
     .replace(/&([a-z]+);/gi, (m, n) => NAMED[n.toLowerCase()] ?? m);
 }
 
+// Очищення працює за лінійний час. Попередні вирази (<script[\s\S]*?…>) були квадратичними:
+// один запис на сотні кілобайт із «<» зупиняв усю збірку (аудит безпеки 21.11).
+const MAX_RAW = 20000; // сирий текст одного поля; далі однаково ріжемо до 220/240 знаків
+const INVISIBLE = /[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff]/g;
+function dropBlocks(s, tag) {
+  const low = s.toLowerCase();
+  let out = '', pos = 0;
+  for (;;) {
+    const a = low.indexOf('<' + tag, pos);
+    if (a < 0) break;
+    const b = low.indexOf('</' + tag, a);
+    out += s.slice(pos, a) + ' ';
+    if (b < 0) { pos = s.length; break; }
+    pos = b;
+  }
+  return out + s.slice(pos);
+}
+const stripTags = (s) => s.replace(/<[^<>]*>/g, ' ');
+
 export function cleanText(s, max = 0) {
-  let t = decodeEntities(decodeEntities(String(s ?? '')
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]*>/g, ' ')))
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<[^>]*>/g, ' ')            // теги, що були закодовані сутностями
-    .replace(/[\u0000-\u001f\u007f]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  let t = String(s ?? '').slice(0, MAX_RAW);
+  t = stripTags(dropBlocks(dropBlocks(t, 'script'), 'style'));
+  t = stripTags(dropBlocks(decodeEntities(decodeEntities(t)), 'script')); // теги, що були закодовані сутностями
+  t = t.replace(INVISIBLE, ' ').replace(/\s+/g, ' ').trim();
   if (max && t.length > max) {
     t = t.slice(0, max);
     const cut = t.lastIndexOf(' ');
@@ -64,8 +79,11 @@ function safeCp(n) {
 
 export function safeUrl(u) {
   try {
-    const url = new URL(decodeEntities(String(u ?? '')).trim());
+    const raw = decodeEntities(String(u ?? '').slice(0, 4000)).trim();
+    if (raw.length > 2000) return '';                                        // наддовга адреса
+    const url = new URL(raw);
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+    if (url.username || url.password) return '';                             // https://bbc.com@evil.example/ — підміна
     return url.toString();
   } catch { return ''; }
 }
@@ -106,7 +124,7 @@ export function parseFeed(xml) {
 export function normalizeItems(raw, source, now = Date.now()) {
   const out = [];
   let dropped = 0;
-  for (const r of raw) {
+  for (const r of raw.slice(0, MAX_RAW_ITEMS)) {
     const title = cleanText(r.title, 220);
     const url = safeUrl(r.link);
     const ts = Date.parse(r.date);

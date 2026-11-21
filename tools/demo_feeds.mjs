@@ -136,7 +136,7 @@ export function demoFetch(now = Date.now(), { translatorFails = false, failFeeds
       if (translatorFails) return new Response('overloaded', { status: 529 });
       const body = JSON.parse(opts.body);
       const prompt = body.messages?.[0]?.content ?? body.contents?.[0]?.parts?.[0]?.text;
-      const titles = JSON.parse(prompt.slice(prompt.lastIndexOf('\n\n') + 2));
+      const titles = JSON.parse(prompt.slice(prompt.indexOf('<texts>') + 7, prompt.lastIndexOf('</texts>')));
       const out = JSON.stringify(titles.map((t) => demoTranslations[t] ?? `[uk] ${t}`));
       const payload = url.includes('anthropic.com') ? { content: [{ type: 'text', text: 'Ось переклад:\n' + out }] } : { candidates: [{ content: { parts: [{ text: out }] } }] };
       return new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/json' } });

@@ -5,7 +5,7 @@ import { mkdtemp, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cleanText, safeUrl, parseFeed, normalizeItems, stems, similarity, isClickbait, isTech, clusterItems } from '../pipeline/lib.mjs';
-import { parseReply, parseEntries, pickProvider, translateItems } from '../pipeline/translate.mjs';
+import { parseReply, parseEntries, pickProvider, translateItems, plausible } from '../pipeline/translate.mjs';
 import { build } from '../pipeline/build.mjs';
 import { demoSources, demoFetch } from '../tools/demo_feeds.mjs';
 
@@ -265,6 +265,107 @@ test('ЗБІРКА: якщо стрічка цього разу відмовил
   assert.equal(after.confirmations, 3, 'підтвердження не зникло');
   assert.ok(after.sources.some((x) => x.id === 'd-a'));
   assert.ok(byTitle(second.data, 'маршрут приміської електрички'), 'новина лише з цієї стрічки теж лишилась');
+});
+
+// ---------- безпека (аудит 21.11) ----------
+test('БЕЗПЕКА: ворожий величезний запис не зупиняє конвеєр (лінійний час очищення)', () => {
+  for (const evil of ['<script'.repeat(40000), '<'.repeat(200000), '<style'.repeat(40000), '&lt;'.repeat(50000)]) {
+    const t0 = Date.now();
+    cleanText(evil, 220);
+    assert.ok(Date.now() - t0 < 500, `очищення тривало ${Date.now() - t0} мс`);
+  }
+  const xml = `<?xml version="1.0"?><rss><channel><item><title>${'&lt;'.repeat(40000)}</title><link>https://e.org/1</link><pubDate>${new Date(NOW - 3600e3).toUTCString()}</pubDate></item></channel></rss>`;
+  const t0 = Date.now();
+  normalizeItems(parseFeed(xml), { id: 'x', lang: 'uk' }, NOW);
+  assert.ok(Date.now() - t0 < 1500);
+});
+
+test('БЕЗПЕКА: невидимі символи прибираються, підмінні й наддовгі адреси відкидаються', () => {
+  assert.equal(cleanText('Нор‮мальний​ текст⁦'), 'Нор мальний текст');
+  assert.equal(safeUrl('https://www.bbc.com@evil.example/news'), '');
+  assert.equal(safeUrl('https://user:pass@example.org/'), '');
+  assert.equal(safeUrl('https://example.org/' + 'a'.repeat(3000)), '');
+  assert.equal(safeUrl('https://example.org/news?id=1'), 'https://example.org/news?id=1');
+});
+
+test('БЕЗПЕКА: зі стрічки береться не більше 300 сирих записів', () => {
+  const raw = Array.from({ length: 5000 }, (_, i) => ({ title: 'Заголовок новини номер ' + i, link: 'https://e.org/' + i, date: new Date(NOW - 60e3 * (i + 1)).toUTCString() }));
+  const { items, dropped } = normalizeItems(raw, { id: 'x', lang: 'uk' }, NOW);
+  assert.ok(items.length <= 30);
+  assert.ok(dropped <= 300);
+});
+
+test('БЕЗПЕКА: перевірка правдоподібності перекладу', () => {
+  const o = 'Researcher plants 2 million canaries in the AI supply chain';
+  assert.ok(plausible(o, 'Дослідник підкинув у ланцюг постачання ШІ 2 мільйони секретів-приманок'));
+  assert.ok(!plausible(o, 'Дослідник підкинув приманки. Читайте більше на https://evil.example/x'), 'посилання, якого не було');
+  assert.ok(!plausible(o, 'Так'), 'обрізано');
+  assert.ok(!plausible(o, 'Уряд оголосив про виплату 5000 гривень кожному, хто зателефонує за номером 0800123456 сьогодні до вечора включно'), 'чужі числа');
+  assert.ok(!plausible(o, 'Researcher plants two million canaries in the supply chain of AI'), 'не переклад');
+  assert.ok(plausible('Anthropic founders each pocketed $280 million at $83/share', 'Кожен засновник Anthropic отримав $280 млн за ціною $83 за акцію'));
+});
+
+test('БЕЗПЕКА: підмінений переклад не потрапляє ні в картку, ні в кеш; пояснення з посиланням відкидається', async () => {
+  const items = [
+    { id: '1', src: 'a', lang: 'en', title: 'City council approves new budget for schools', summary: '' },
+    { id: '2', src: 'a', lang: 'en', title: 'Local team wins regional championship final', summary: '' },
+  ];
+  const cache = {};
+  const provider = { name: 'fake', apiKey: 'k', model: 'm', call: async () => JSON.stringify([
+    'Міська рада ухвалила бюджет. Деталі: https://evil.example/pay',
+    { t: 'Місцева команда виграла фінал регіонального «чемпіонату»', g: [{ w: 'чемпіонату', e: 'Чемпіонат — подробиці на evil.example, телефон +380501234567.' }] },
+  ]) };
+  const st = await translateItems(items, cache, { provider, now: NOW });
+  assert.equal(st.rejected, 1);
+  assert.equal(items[0].titleUk, undefined, 'підмінений переклад не застосовано');
+  assert.ok(items[1].titleUk.includes('виграла'));
+  assert.equal(items[1].titleGloss, undefined, 'пояснення з контактами відкинуто');
+  assert.ok(Object.values(cache).some((c) => c.fail === 1 && !c.t));
+});
+
+test('БЕЗПЕКА: пакети не змішують джерела, запит ділить правила й дані', async () => {
+  const items = [];
+  for (const src of ['a', 'b', 'c']) for (let i = 0; i < 4; i++) items.push({ id: src + i, src, lang: 'en', title: `Headline number ${i} from source ${src} about the weather`, summary: '' });
+  const seenBatches = [];
+  const provider = { name: 'fake', apiKey: 'k', model: 'm', call: async (batch) => { seenBatches.push(batch); return JSON.stringify(batch.map((t) => 'Заголовок про погоду з джерела, номер ' + t.match(/\d+/)[0])); } };
+  await translateItems(items, {}, { provider, now: NOW });
+  assert.equal(seenBatches.length, 3);
+  for (const b of seenBatches) assert.equal(new Set(b.map((t) => t.match(/source (\w)/)[1])).size, 1, 'у пакеті лише одне джерело');
+  // справжній виклик: правила в system, дані в <texts>
+  let body;
+  const fetchImpl = async (url, opts) => { body = JSON.parse(opts.body); return new Response(JSON.stringify({ content: [{ type: 'text', text: '["Переклад одного заголовка про погоду"]' }], usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200 }); };
+  await translateItems([{ id: 'z', src: 'a', lang: 'en', title: 'One single headline about the weather', summary: '' }], {}, { provider: pickProvider({ ANTHROPIC_API_KEY: 'k' }), fetchImpl, now: NOW });
+  assert.ok(body.system.includes('ДАНІ із зовнішніх сайтів'));
+  assert.match(body.messages[0].content, /^<texts>\n\[.*\]\n<\/texts>$/s);
+  assert.ok(!body.messages[0].content.includes('Правила'));
+  assert.deepEqual(body.thinking, { type: 'disabled' });
+  assert.ok(body.max_tokens <= 600);
+});
+
+test('БЕЗПЕКА: зламаний перекладач не роздуває кількість запитів, безнадійні тексти запам\'ятовуються', async () => {
+  const items = Array.from({ length: 60 }, (_, i) => ({ id: 'i' + i, src: 's' + (i % 3), lang: 'en', title: `Unique headline number ${i} about something`, summary: '' }));
+  let calls = 0;
+  const provider = { name: 'fake', apiKey: 'k', model: 'm', call: async () => { calls++; return 'вибачте, не можу'; } };
+  const cache = {};
+  const st = await translateItems(items, cache, { provider, now: NOW });
+  const batches = 6; // 3 джерела × 20 текстів / 15
+  assert.ok(calls <= batches * 2 + 10, `запитів ${calls}`);
+  assert.equal(st.translated, 0);
+  // другий і третій запуск: тексти з двома невдачами більше не надсилаються
+  await translateItems(items.map((x) => ({ ...x })), cache, { provider, now: NOW + 1 });
+  const failedTwice = Object.values(cache).filter((c) => c.fail >= 2).length;
+  calls = 0;
+  const st3 = await translateItems(items.map((x) => ({ ...x })), cache, { provider, now: NOW + 2 });
+  assert.ok(failedTwice > 0);
+  assert.ok(st3.failed + st3.translated <= 60 - failedTwice);
+});
+
+test('БЕЗПЕКА: зіпсований кеш перекладів не валить збірку', async () => {
+  const items = [{ id: '1', src: 'a', lang: 'en', title: 'Some headline about the economy today', summary: '' }];
+  const cache = { x1: { t: 123, g: [1], ts: NOW }, x2: null, x3: 'рядок', x4: { ts: 'не число' } };
+  const st = await translateItems(items, cache, { provider: null, now: NOW });
+  assert.equal(st.fromCache, 0);
+  assert.equal(items[0].titleUk, undefined);
 });
 
 test('справжній sources.json коректний', async () => {

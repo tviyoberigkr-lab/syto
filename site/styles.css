@@ -47,6 +47,7 @@ h2{font:700 24px/1.2 var(--serif);margin:0}
    Вертикальний padding із від'ємним margin збільшує зону натискання, не розсуваючи рядки. */
 .term{display:inline;font:inherit;color:var(--accent);background:none;border:0;border-radius:4px;margin:-8px 0;padding:8px 0;cursor:pointer;text-decoration:none;text-align:inherit;-webkit-tap-highlight-color:transparent}
 .term[aria-expanded="true"]{background:var(--line);background-clip:content-box}
+.gloss-note{display:block;margin-top:4px;color:var(--muted);font-size:12px}
 .gloss{margin:6px 0 0;padding:8px 10px;border-left:3px solid var(--accent);background:var(--bg);border-radius:0 8px 8px 0;color:var(--ink);font:14.5px/1.45 var(--sans)}
 .term-sample{color:var(--accent);font-weight:700}
 .meta{margin:8px 0 0;color:var(--muted);font-size:13px}

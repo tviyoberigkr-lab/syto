@@ -4,6 +4,8 @@ import { XMLParser } from 'fast-xml-parser';
 import { createHash } from 'node:crypto';
 
 export const WINDOW_HOURS = 48;        // новини старші за це не показуємо
+export const FAKES_WINDOW_HOURS = 168;  // спростування виходять рідше й лишаються актуальними довше — тиждень
+export const windowFor = (source) => (source?.cat === 'fakes' ? FAKES_WINDOW_HOURS : WINDOW_HOURS);
 export const CLUSTER_GAP_HOURS = 36;   // максимум між двома повідомленнями про одну подію
 export const SIM_THRESHOLD = 0.5;      // поріг схожості заголовків
 export const PER_FEED_LIMIT = 30;      // беремо не більше N найсвіжіших з кожної стрічки
@@ -129,7 +131,7 @@ export function normalizeItems(raw, source, now = Date.now()) {
     const url = safeUrl(r.link);
     const ts = Date.parse(r.date);
     const age = (now - ts) / 3600e3;
-    if (!title || title.length < 8 || !url || !Number.isFinite(ts) || age > WINDOW_HOURS || age < -1) { dropped++; continue; }
+    if (!title || title.length < 8 || !url || !Number.isFinite(ts) || age > windowFor(source) || age < -1) { dropped++; continue; }
     out.push({
       id: createHash('sha1').update(url).digest('hex').slice(0, 12),
       title, url, ts: Math.min(ts, now),

@@ -383,6 +383,12 @@ test('видання однієї редакційної групи не під�
   assert.equal(three.confirmations, 2);
 });
 
+test('спростування живуть тиждень, звичайні новини — 48 год', () => {
+  const raw = [{ title: 'Спростування старого фейку про школи', link: 'https://e.org/f', date: new Date(NOW - 100 * 3600e3).toUTCString() }];
+  assert.equal(normalizeItems(raw, { id: 'fc', lang: 'uk', cat: 'fakes' }, NOW).items.length, 1);
+  assert.equal(normalizeItems(raw, { id: 'n', lang: 'uk', cat: 'ukraine' }, NOW).items.length, 0);
+});
+
 test('справжній sources.json коректний', async () => {
   const { sources } = JSON.parse(await readFile(new URL('../sources.json', import.meta.url), 'utf8'));
   const ids = new Set();

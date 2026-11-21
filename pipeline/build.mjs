@@ -4,7 +4,7 @@
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseFeed, normalizeItems, assemble, WINDOW_HOURS } from './lib.mjs';
+import { parseFeed, normalizeItems, assemble, windowFor } from './lib.mjs';
 import { translateItems, pickProvider } from './translate.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -61,9 +61,9 @@ export async function build({
   // GitHub через раз) або вже витіснила запис новішими, він не зникає зі стрічки Syto.
   let kept = 0;
   try {
-    const active = new Set(sources.map((s) => s.id));
+    const active = new Map(sources.map((s) => [s.id, s]));
     for (const it of JSON.parse(await readFile(storePath, 'utf8'))) {
-      if (it && active.has(it.src) && typeof it.ts === 'number' && now - it.ts <= WINDOW_HOURS * 3600e3 && it.ts <= now) byId.set(it.id, it);
+      if (it && active.has(it.src) && typeof it.ts === 'number' && now - it.ts <= windowFor(active.get(it.src)) * 3600e3 && it.ts <= now) byId.set(it.id, it);
     }
     kept = byId.size;
   } catch { /* першого разу сховища ще немає */ }

@@ -25,8 +25,8 @@
     {"id": "economist", "name": "The Economist", "feed": "https://www.economist.com/international/rss.xml", "lang": "en", "country": "GB", "cat": "world", "type": "independent", "trust": 3},
     {"id": "spiegel-intl", "name": "Der Spiegel International", "feed": "https://www.spiegel.de/international/index.rss", "lang": "en", "country": "DE", "cat": "world", "type": "independent", "trust": 3},
     {"id": "npr-world", "name": "NPR — National Public Radio", "feed": "https://feeds.npr.org/1004/rss.xml", "lang": "en", "country": "US", "cat": "world", "type": "public", "trust": 3},
-    {"id": "cbc-world", "name": "CBC News (Канада)", "feed": "https://www.cbc.ca/webfeed/rss/rss-world", "lang": "en", "country": "CA", "cat": "world", "type": "public", "trust": 3},
-    {"id": "nhk-world", "name": "NHK World-Japan", "feed": "https://www3.nhk.or.jp/rss/news/cat6.xml", "lang": "en", "country": "JP", "cat": "world", "type": "public", "trust": 3},
+    {"id": "cbc-world", "name": "CBC News (Канада)", "feed": "https://rss.cbc.ca/lineup/world.xml", "lang": "en", "country": "CA", "cat": "world", "type": "public", "trust": 3},
+    {"id": "nhk-world", "enabled": false, "note": "21.11.2026: відкритої англомовної RSS у NHK World не знайдено; японська стрічка не дала придатних записів", "name": "NHK World-Japan", "feed": "https://www3.nhk.or.jp/rss/news/cat6.xml", "lang": "en", "country": "JP", "cat": "world", "type": "public", "trust": 3},
     {"id": "notes-poland", "name": "Notes from Poland", "feed": "https://notesfrompoland.com/feed/", "lang": "en", "country": "PL", "cat": "world", "type": "independent", "trust": 2},
     {"id": "aljazeera", "name": "Al Jazeera English (фінансує держава Катар)", "feed": "https://www.aljazeera.com/xml/rss/all.xml", "lang": "en", "country": "QA", "cat": "world", "type": "state", "trust": 2},
     {"id": "meduza", "name": "Meduza", "feed": "https://meduza.io/rss/all", "lang": "ru", "country": "RU", "cat": "world", "type": "exile", "trust": 2},
@@ -36,7 +36,7 @@
 
     {"id": "scmp-china", "group": "scmp", "name": "South China Morning Post", "feed": "https://www.scmp.com/rss/4/feed", "lang": "en", "country": "CN", "cat": "world", "type": "independent", "trust": 2},
     {"id": "caixin", "name": "Caixin Global", "enabled": false, "note": "21.11.2026: відмовляє GitHub (403), запасна офіційна стрічка не оновлюється з 2025", "feed": "https://www.caixinglobal.com/rss", "lang": "en", "country": "CN", "cat": "world", "type": "independent", "trust": 2},
-    {"id": "xinhua", "name": "Сіньхуа (Xinhua)", "feed": "http://www.xinhuanet.com/english/rss/worldrss.xml", "lang": "en", "country": "CN", "cat": "world", "type": "state", "trust": 1},
+    {"id": "xinhua", "enabled": false, "note": "21.11.2026: стрічка відповідає, але записи старі — не оновлюється", "name": "Сіньхуа (Xinhua)", "feed": "http://www.xinhuanet.com/english/rss/worldrss.xml", "lang": "en", "country": "CN", "cat": "world", "type": "state", "trust": 1},
 
     {"id": "bbc-tech", "group": "bbc", "name": "BBC News — Technology", "feed": "https://feeds.bbci.co.uk/news/technology/rss.xml", "lang": "en", "country": "GB", "cat": "tech", "type": "public", "trust": 3},
     {"id": "nyt-tech", "group": "nyt", "name": "The New York Times — Technology", "feed": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 3},

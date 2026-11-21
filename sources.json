@@ -32,9 +32,9 @@
     {"id": "bbc-tech", "name": "BBC News — Technology", "feed": "https://feeds.bbci.co.uk/news/technology/rss.xml", "lang": "en", "country": "GB", "cat": "tech", "type": "public", "trust": 3},
     {"id": "nyt-tech", "name": "The New York Times — Technology", "feed": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 3},
     {"id": "mit-tr", "name": "MIT Technology Review", "feed": "https://www.technologyreview.com/feed/", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 3},
-    {"id": "verge-ai", "name": "The Verge — Artificial Intelligence", "feed": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 2},
+    {"id": "verge-ai", "name": "The Verge — AI", "feed": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 2},
     {"id": "ars", "name": "Ars Technica", "feed": "https://feeds.arstechnica.com/arstechnica/index", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 3},
-    {"id": "tc-ai", "name": "TechCrunch — Artificial Intelligence", "feed": "https://techcrunch.com/category/artificial-intelligence/feed/", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 2},
+    {"id": "tc-ai", "name": "TechCrunch — AI", "feed": "https://techcrunch.com/category/artificial-intelligence/feed/", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 2},
     {"id": "scmp-tech", "name": "South China Morning Post — Tech", "feed": "https://www.scmp.com/rss/36/feed", "lang": "en", "country": "CN", "cat": "tech", "type": "independent", "trust": 2},
     {"id": "ain", "name": "AIN.UA", "feed": "https://ain.ua/feed/", "lang": "uk", "country": "UA", "cat": "tech", "type": "independent", "trust": 2},
 

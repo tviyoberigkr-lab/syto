@@ -402,3 +402,8 @@ test('справжній sources.json коректний', async () => {
     if (s.group !== undefined) assert.match(s.group, /^[a-z0-9-]+$/);
   }
 });
+
+test('cleanText прибирає рекламні вставки видань', () => {
+  const raw = 'Former officer pleaded not guilty Get our breaking news email , free app or daily news podcast Beau knew he had murdered';
+  assert.equal(cleanText(raw), 'Former officer pleaded not guilty Beau knew he had murdered');
+});

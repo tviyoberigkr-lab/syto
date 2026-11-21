@@ -63,11 +63,15 @@ function dropBlocks(s, tag) {
 }
 const stripTags = (s) => s.replace(/<[^<>]*>/g, ' ');
 
+// Рекламні вставки, які деякі видання кладуть прямо в опис новини.
+const PROMO = /\b(Get our breaking news email|Sign up for our breaking news email)[^.…]{0,120}?(daily news podcast|newsletter)\b\.?/gi;
+
 export function cleanText(s, max = 0) {
   let t = String(s ?? '').slice(0, MAX_RAW);
   t = stripTags(dropBlocks(dropBlocks(t, 'script'), 'style'));
   t = stripTags(dropBlocks(decodeEntities(decodeEntities(t)), 'script')); // теги, що були закодовані сутностями
   t = t.replace(INVISIBLE, ' ').replace(/\s+/g, ' ').trim();
+  t = t.replace(PROMO, ' ').replace(/\s+/g, ' ').trim(); // рекламні вставки видань (The Guardian тощо)
   if (max && t.length > max) {
     t = t.slice(0, max);
     const cut = t.lastIndexOf(' ');

@@ -106,6 +106,7 @@ export async function build({
   for (const n of tr.notes) log(`  УВАГА: ${n}`);
   for (const e of tr.errors.slice(0, 3)) log(`  переклад: ${e}`);
   for (const h of health.filter((x) => !x.ok)) log(`  ✗ ${h.name}: ${h.error}`);
+  for (const h of health.filter((x) => x.ok && !x.items)) log(`  ⚠ ${h.name}: стрічка відповіла, але свіжих записів 0 (відкинуто ${h.dropped ?? 0})`);
   return { written: true, data };
 }
 

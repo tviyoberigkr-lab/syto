@@ -68,7 +68,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          TRANSLATE_MODEL: ${{ vars.TRANSLATE_MODEL }}
+          TRANSLATE_MODEL: ${{ vars.TRANSLATE_MODEL || 'claude-sonnet-5-5' }}   # 22.11: Sonnet 5.5 за рішенням Романа (платиться з подарункових кредитів)
           # Щоб зупинити нові переклади (витрати), постав тут '0': уже перекладене береться з кешу безкоштовно.
           TRANSLATE_MAX_NEW: ${{ vars.TRANSLATE_MAX_NEW }}
       - name: Зберегти кеш перекладів

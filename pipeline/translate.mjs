@@ -127,7 +127,8 @@ async function callAnthropic(titles, { apiKey, model, fetchImpl, usage, notes })
   // Haiku 5.5 за замовчуванням «думає» перед відповіддю, і ці токени оплачуються як вихідні
   // (20–21.11 виходило ~300–800 вихідних токенів на один короткий текст). Для перекладу заголовків
   // міркування не потрібні — вимикаємо. Документація: thinking {type: "disabled"} дозволено для Haiku 5.5.
-  const noThinking = /^claude-haiku/.test(model);
+  // 22.11: Роман перевів Syto на Sonnet 5.5 — йому міркування для перекладу теж не потрібні.
+  const noThinking = /^claude-(haiku|sonnet)/.test(model);
   const send = (withFlag) => fetchImpl('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },

@@ -56,7 +56,7 @@
     {"id": "cdt", "name": "China Digital Times", "feed": "https://chinadigitaltimes.net/feed/", "lang": "en", "country": "US", "cat": "world", "type": "independent", "trust": 2},
     {"id": "ukrinform-factcheck", "group": "ukrinform", "name": "Укрінформ — Фактчек (державне агентство)", "feed": "https://www.ukrinform.ua/rss/rubric-factcheck", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 2},
     {"id": "stopfake", "name": "StopFake", "feed": "https://www.stopfake.org/uk/feed/", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 3},
-    {"id": "voxcheck", "name": "VoxCheck", "feed": "https://voxukraine.org/category/voxcheck/feed", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 3},
+    {"id": "voxcheck", "enabled": false, "note": "23.11.2026: HTTP 403 для GitHub з 21.11 (крім одного запуску) — вимкнено; повернути разом із Суспільним, якщо запуск буде з ПК Романа", "name": "VoxCheck", "feed": "https://voxukraine.org/category/voxcheck/feed", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 3},
     {"id": "behindthenews", "name": "По той бік новин", "enabled": false, "note": "20.11.2026: адреса RSS дає 404 з GitHub, чинну не знайдено", "feed": "https://behindthenews.ua/feed/", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 3}
   ]
 }

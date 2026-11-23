@@ -220,11 +220,11 @@ for (const [name, env] of [['Gemini', { GEMINI_API_KEY: 'test' }], ['Anthropic',
     const ai = byTitle(d, 'модель ШІ');
     assert.equal(ai.confirmations, 2, 'англомовна й українська техноновина зійшлися');
     assert.equal(byTitle(d, 'рекордні').status, 'state');
-    assert.equal(d.stats.translation.translated, 11, '9 старих текстів + заголовок і опис демо-новини з термінами');
+    assert.equal(d.stats.translation.translated, 12, '9 старих текстів + опис мосту (рос.) + заголовок і опис демо-новини з термінами');
     // другий запуск: усе з кешу, платних викликів немає
     const second = await run(env, {}, first.dir);
     assert.equal(second.fetchImpl.calls.translate, 0);
-    assert.equal(second.data.stats.translation.fromCache, 11);
+    assert.equal(second.data.stats.translation.fromCache, 12);
     assert.equal(byTitle(second.data, 'міст через річку').confirmations, 4);
   });
 }
@@ -239,7 +239,7 @@ test('ЗБІРКА: пауза перекладу (TRANSLATE_MAX_NEW=0) не р�
 test('ЗБІРКА: збій перекладача не валить збірку', async () => {
   const { data, written } = await run({ ANTHROPIC_API_KEY: 'test' }, { translatorFails: true });
   assert.ok(written);
-  assert.equal(data.stats.translation.failed, 11);
+  assert.equal(data.stats.translation.failed, 12);
   assert.ok(byTitle(data, 'undersea cable'));
 });
 
@@ -456,4 +456,16 @@ test('topicOf: «Україна» — про Україну, «Світ» — р
   // звичайні слова не плутаються з назвами
   assert.equal(t('Кримінальна справа щодо банкіра у Франції', 'uk', WD), 'world');
   assert.equal(t('Ціна газу для населення не зміниться до весни'), 'ukraine');
+  // правила 23.11 (після скріна Романа): Тайсон Ф'юрі — не про Україну, хоч в описі Кличко і новину дало BBC Україна
+  const fury = [
+    { title: '"Чув голоси". Боксер Тайсон Ф\'юрі розповів, що йому діагностували шизофренію', lang: 'uk', source: UA,
+      summary: 'Тайсон Ф\'юрі розповів, що йому діагностували шизофренію невдовзі після перемоги над Володимиром Кличком у 2015 році.' },
+    { title: 'Тайсон Фьюри рассказал, что слышал голоса', lang: 'ru', source: WD, summary: '' },
+  ];
+  assert.equal(topicOf(fury), 'world');
+  // Україна лише в описі: якщо заголовок про іншу країну — «Світ», якщо ні — «Україна»
+  assert.equal(t('Фінляндія викликала посла Росії через порушення повітряного простору', 'uk', UA, 'Минулого тижня дрони атакували Україну.'), 'world');
+  assert.equal(t('Відкрили новий міст після ремонту', 'en', WD, 'The bridge near Kyiv was destroyed in 2022.'), 'ukraine');
+  // внутрішня новина, яку дали лише українськомовні редакції (DW українською — теж), — «Україна»
+  assert.equal(topicOf([{ title: 'Ексвіцепрем\'єру Чернишову оголосили нову підозру', lang: 'uk', source: WD }, { title: 'Чернишову повідомили про нову підозру', lang: 'uk', source: UA }]), 'ukraine');
 });

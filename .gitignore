@@ -5,3 +5,9 @@ tests/shot-*.png
 Project status/
 workflow_update.yml
 data/items.json
+
+# ключі підпису застосунку — ніколи не в репозиторій
+_ключ_підпису/
+*.p12
+*.jks
+*.keystore

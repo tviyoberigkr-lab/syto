@@ -64,7 +64,7 @@ function dropBlocks(s, tag) {
 const stripTags = (s) => s.replace(/<[^<>]*>/g, ' ');
 
 // Рекламні вставки, які деякі видання кладуть прямо в опис новини.
-const PROMO = /\b(Get our breaking news email|Sign up for our breaking news email)[^.…]{0,120}?(daily news podcast|newsletter)\b\.?/gi;
+const PROMO = /\b(?:Get|Sign up for) our [\w\s-]{0,40}?\b(?:email|newsletter)\b[^.…]{0,120}?\b(?:daily news podcast|podcast|newsletter)\b\.?/gi;
 
 export function cleanText(s, max = 0) {
   let t = String(s ?? '').slice(0, MAX_RAW);

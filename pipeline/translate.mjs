@@ -62,6 +62,22 @@ export function plausible(orig, t) {
   for (const n of nums(t)) if (n.length >= 2 && !o.has(n) && !joined.includes(n)) return false;
   return true;
 }
+
+/** Слова, де модель змішала кирилицю з латиницею («Дímер», «переклbasти»). Латинські двійники літер виправляємо,
+ *  решту вважаємо зіпсованим перекладом. Слова, що стоять в оригіналі дослівно, не чіпаємо. */
+const HOMO = { a: 'а', c: 'с', e: 'е', i: 'і', o: 'о', p: 'р', x: 'х', y: 'у', A: 'А', B: 'В', C: 'С', E: 'Е', H: 'Н', I: 'І', K: 'К', M: 'М', O: 'О', P: 'Р', T: 'Т', X: 'Х', 'í': 'і', 'ó': 'о', 'é': 'е', 'á': 'а' };
+const MIXED = /[\p{L}\p{M}]+/gu;
+const isMixed = (w) => /[\u0400-\u04ff]/.test(w) && /[a-zA-Z\u00c0-\u024f]/.test(w);
+export function fixMixed(orig, t) {
+  let bad = false;
+  const out = String(t).replace(MIXED, (w) => {
+    if (!isMixed(w) || String(orig).includes(w)) return w;
+    const f = [...w].map((ch) => (/[a-zA-Z\u00c0-\u024f]/.test(ch) ? HOMO[ch] ?? ch : ch)).join('');
+    if (isMixed(f)) bad = true;
+    return f;
+  });
+  return { t: out, bad };
+}
 /** Пояснення терміна: без посилань, контактів і довгих чисел. */
 const glossOk = (e) => !URLISH.test(e) && !/\d{5,}/.test(e);
 
@@ -208,6 +224,9 @@ export async function translateItems(items, cache, { provider, maxNew = 400, fet
       const k = key(text);
       const c = cache[k];
       if (usable(c)) {
+        const fx = fixMixed(c.o ?? text, c.t);
+        if (fx.bad) { delete cache[k]; if (count && !seen.has(k)) { seen.add(k); todo.push({ text, src: it.src ?? '' }); } continue; }
+        if (fx.t !== c.t) c.t = fx.t;
         it[dst] = c.t;
         const g = cleanGloss(c.g, c.t); // перевіряємо й кеш: його могли редагувати руками
         if (g.length) it[gl] = g;
@@ -243,7 +262,9 @@ export async function translateItems(items, cache, { provider, maxNew = 400, fet
         const reply = await provider.call(batch, { apiKey: provider.apiKey, model: provider.model, fetchImpl, usage: stats.usage, notes: stats.notes });
         const out = parseEntries(reply, batch.length);
         batch.forEach((t, j) => {
-          if (!plausible(t, out[j].t)) { stats.rejected++; cache[key(t)] = { fail: (cache[key(t)]?.fail ?? 0) + 1, o: t, ts: now }; return; }
+          const fx = fixMixed(t, out[j].t);
+          out[j].t = fx.t;
+          if (fx.bad || !plausible(t, out[j].t)) { stats.rejected++; cache[key(t)] = { fail: (cache[key(t)]?.fail ?? 0) + 1, o: t, ts: now }; return; }
           // o — оригінал: потрібен, щоб перевіряти якість перекладу проти джерела; g — лише коли є терміни
           cache[key(t)] = { t: out[j].t, o: t, ...(out[j].g ? { g: out[j].g } : {}), ts: now };
           stats.translated++;

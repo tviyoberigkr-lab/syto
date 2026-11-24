@@ -469,3 +469,18 @@ test('topicOf: «Україна» — про Україну, «Світ» — р
   // внутрішня новина, яку дали лише українськомовні редакції (DW українською — теж), — «Україна»
   assert.equal(topicOf([{ title: 'Ексвіцепрем\'єру Чернишову оголосили нову підозру', lang: 'uk', source: WD }, { title: 'Чернишову повідомили про нову підозру', lang: 'uk', source: UA }]), 'ukraine');
 });
+
+test('PROMO: прибирає й політичну розсилку Guardian', async () => {
+  const { cleanText } = await import('../pipeline/lib.mjs');
+  const r = cleanText('Nearly half say no. Get our daily political email , free app or daily news podcast A new poll shows');
+  assert.ok(!/Get our|podcast/.test(r), r);
+  assert.ok(/A new poll shows/.test(r));
+});
+test('fixMixed: латинські двійники виправляє, зіпсоване слово відкидає, слова з оригіналу не чіпає', async () => {
+  const { fixMixed } = await import('../pipeline/translate.mjs');
+  assert.deepEqual(fixMixed('x', 'у мерiях Ослo'), { t: 'у меріях Осло', bad: false });
+  assert.equal(fixMixed('x', 'селище Дímер').bad, true);
+  assert.equal(fixMixed('x', 'треба переклbasти').bad, true);
+  assert.equal(fixMixed('iPhoneом', 'з iPhoneом').t, 'з iPhoneом');
+  assert.deepEqual(fixMixed('x', 'Apple і Google'), { t: 'Apple і Google', bad: false });
+});

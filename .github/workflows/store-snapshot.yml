@@ -1,0 +1,27 @@
+# Syto — знімок живих даних для скрінів у Google Play (запуск вручну). CoLaba Production
+# Забирає опублікований news.json і кладе його в окрему гілку store-data, щоб скріни
+# для магазину робилися зі справжніми новинами, а не з демо-даних. У main нічого не пише.
+name: Знімок даних для скрінів
+on:
+  workflow_dispatch:
+permissions: {}
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Забрати опублікований news.json
+        run: |
+          mkdir -p store
+          curl -fsSL "https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/data/news.json" -o store/news_snapshot.json
+          test -s store/news_snapshot.json
+      - name: Записати в гілку store-data
+        run: |
+          git config user.name "syto-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B store-data
+          git add store/news_snapshot.json
+          git commit -m "знімок даних для скрінів [skip ci]"
+          git push -f origin store-data

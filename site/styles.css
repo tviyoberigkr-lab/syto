@@ -85,3 +85,9 @@ details[open] summary::after{content:"▴"}
 .srctable small{display:block;color:var(--muted);font-size:12.5px}
 .group{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:16px 0 4px}
 @media (min-width:760px){ body{font-size:17px} .card h3{font-size:20px} .tabs a{flex-direction:row;gap:8px;font-size:14px} }
+
+/* сторінка політики конфіденційності й кнопка «Повідомити про помилку» */
+.doc-page{max-width:720px;margin:0 auto;padding:18px 16px 40px}
+.doc-page h1{font:700 26px/1.25 var(--serif);margin:10px 0 4px}
+.foot a,.method a{color:var(--accent)}
+.btn-report{display:inline-block;margin:6px 0 4px;padding:10px 16px;border:1px solid var(--accent);border-radius:10px;color:var(--accent);text-decoration:none;font-weight:600}

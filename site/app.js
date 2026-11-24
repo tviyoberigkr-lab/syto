@@ -15,6 +15,9 @@
   };
   var LANG_LABEL = { uk: 'українською', en: 'англійською', ru: 'російською' };
   var REFRESH_MS = 10 * 60 * 1000;
+  // Пошта для звернень і повідомлень про помилки. Порожньо — блок контактів не показується.
+  // Заповнити, щойно з'явиться окрема пошта Syto (потрібна до виходу в Google Play).
+  var CONTACT_EMAIL = '';
 
   var $ = function (id) { return document.getElementById(id); };
   var state = { data: null, tab: 'ukraine', filter: 'all', offline: false, loadedAt: 0 };
@@ -275,6 +278,19 @@
         });
         box.appendChild(ul);
       });
+    }
+    box.appendChild(el('h3', null, 'Конфіденційність'));
+    box.appendChild(el('p', null, 'Syto не просить реєстрації й не збирає персональних даних: без реклами, аналітики й cookie. На пристрої зберігаються лише ваш вибір фільтра й копія новин для роботи без інтернету.'));
+    var pl = el('p'); var pa = el('a', null, 'Політика конфіденційності'); pa.href = 'privacy.html'; pl.appendChild(pa);
+    box.appendChild(pl);
+
+    if (CONTACT_EMAIL) {
+      box.appendChild(el('h3', null, 'Контакти й помилки'));
+      box.appendChild(el('p', null, 'Помітили помилку в перекладі, неправильну позначку чи биту новину? Напишіть нам — це допомагає зробити Syto точнішим.'));
+      var fb = el('a', 'btn-report', 'Повідомити про помилку');
+      fb.href = 'mailto:' + CONTACT_EMAIL + '?subject=' + encodeURIComponent('Syto: повідомлення про помилку');
+      box.appendChild(fb);
+      box.appendChild(el('p', 'hint', 'Пошта: ' + CONTACT_EMAIL));
     }
     v.appendChild(box);
   }

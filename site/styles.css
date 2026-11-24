@@ -16,8 +16,9 @@ a{color:var(--accent)}
 .top{position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line);background:var(--top);color:var(--top-ink);display:flex;align-items:center;justify-content:space-between;gap:12px;
   padding:calc(10px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left))}
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
-.logo{width:34px;height:34px;flex:none;color:#eab13e}
-h1{font:700 22px/1 var(--serif);margin:0;letter-spacing:.3px}
+h1{font:700 28px/1 var(--serif);margin:0;letter-spacing:.3px;white-space:nowrap}
+/* логотип-сито замість літери «О» у назві SytO */
+.logo-o{display:inline-block;width:.76em;height:.76em;margin-left:.03em;vertical-align:-.03em;color:#eab13e}
 .tagline{margin:3px 0 0;font-size:12px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .refresh{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);color:inherit;border:0;border-radius:999px;padding:8px 12px;font:inherit;font-size:13px;min-height:44px;cursor:pointer;white-space:nowrap}
 .refresh svg{width:18px;height:18px}

@@ -153,6 +153,38 @@ async def main():
                 check(not perr, 'прототип без помилок')
                 await p2.screenshot(path=os.path.join(ROOT, f'tests/shot-{scheme}-prototype.png'))
                 await ctx.close()
+            # ---- комп'ютер: вікно 1280x800, мишка (25.11) ----
+            print('[desktop] сайт у вікні 1280x800')
+            ctx = await b.new_context(viewport={'width': 1280, 'height': 800}, locale='uk-UA')
+            page = await ctx.new_page()
+            derr = []
+            page.on('pageerror', lambda e: derr.append(str(e)))
+            await page.goto(f'http://127.0.0.1:{PORT}/')
+            await page.wait_for_selector('.card')
+            subs = await page.evaluate("(() => { const b = document.getElementById('subs'); const r = b.getBoundingClientRect();"
+                                       " return { hidden: b.hidden, scroll: b.scrollWidth - b.clientWidth, rows: new Set([...b.children].map(c => Math.round(c.getBoundingClientRect().top))).size,"
+                                       " last: b.lastElementChild.getBoundingClientRect().right <= r.right + 1 }; })()")
+            check(subs['scroll'] <= 1, f"рубрики не ховаються за прокруткою (приховано {subs['scroll']}px)")
+            check(subs['last'], 'остання рубрика («Сад і город») видна без гортання')
+            check(subs['rows'] >= 1, f"рубрики стоять рядками ({subs['rows']})")
+            await page.click('#subs .sub[data-sub="economy"]')
+            check(await page.locator('.card').count() > 0, 'рубрика перемикається мишею')
+            over = await page.evaluate('document.documentElement.scrollWidth - document.documentElement.clientWidth')
+            check(over <= 0, 'немає горизонтальної прокрутки сторінки')
+            tabs = await page.evaluate("(() => { const t = document.querySelector('.tabs').getBoundingClientRect();"
+                                       " return { w: Math.round(t.width), centered: Math.abs((t.left + t.right) / 2 - window.innerWidth / 2) < 2 }; })()")
+            check(tabs['w'] <= 800 and tabs['centered'], f"панель розділів по центру, не на весь екран ({tabs['w']}px)")
+            align = await page.evaluate("(() => { const b = document.querySelector('.brand').getBoundingClientRect();"
+                                        " const c = document.querySelector('.card').getBoundingClientRect();"
+                                        " const r = document.getElementById('refresh').getBoundingClientRect();"
+                                        " return { left: Math.round(b.left - c.left), right: Math.round(c.right - r.right) }; })()")
+            check(abs(align['left']) <= 14 and abs(align['right']) <= 14, f"шапка в одній колонці з новинами (зсув {align['left']}/{align['right']}px)")
+            await page.click('.tabs a[data-tab="world"]')
+            await wait_title(page, 'Світ')
+            check(await page.locator('#subs .sub').count() == 8, 'у «Світі» рубрики теж на місці')
+            await page.screenshot(path=os.path.join(ROOT, 'tests/shot-desktop-ukraine.png'), full_page=False)
+            check(not derr, 'немає помилок сторінки на комп\'ютері' + (': ' + derr[0] if derr else ''))
+            await ctx.close()
             await b.close()
     finally:
         srv.terminate(); shutil.rmtree(tmp, ignore_errors=True)

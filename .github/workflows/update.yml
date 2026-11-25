@@ -71,14 +71,17 @@ jobs:
           TRANSLATE_MODEL: ${{ vars.TRANSLATE_MODEL || 'claude-sonnet-5-5' }}   # 22.11: Sonnet 5.5 за рішенням Романа (платиться з подарункових кредитів)
           # Щоб зупинити нові переклади (витрати), постав тут '0': уже перекладене береться з кешу безкоштовно.
           TRANSLATE_MAX_NEW: ${{ vars.TRANSLATE_MAX_NEW }}
-      - name: Зберегти кеш перекладів
+          # Рубрики українських заголовків (25.11): дешева модель; '0' у CLASSIFY_MAX_NEW зупиняє нові платні запити (кеш працює).
+          CLASSIFY_MODEL: ${{ vars.CLASSIFY_MODEL || 'claude-haiku-5-5' }}
+          CLASSIFY_MAX_NEW: ${{ vars.CLASSIFY_MAX_NEW }}
+      - name: Зберегти кеш перекладів і рубрик
         if: steps.fresh.outputs.skip != 'true'
         run: |
           date -u +%F > data/heartbeat.txt
           git config user.name "syto-bot"
           git config user.email "syto-bot@users.noreply.github.com"
-          git add data/translations.json data/heartbeat.txt
-          git diff --cached --quiet || (git commit -m "дані: кеш перекладів [skip ci]" && git push)
+          git add data/translations.json data/classes.json data/heartbeat.txt
+          git diff --cached --quiet || (git commit -m "дані: кеш перекладів і рубрик [skip ci]" && git push)
       - uses: actions/configure-pages@v5
         if: steps.fresh.outputs.skip != 'true'
       - uses: actions/upload-pages-artifact@v4

@@ -2,6 +2,7 @@
 // CoLaba Production
 import { XMLParser } from 'fast-xml-parser';
 import { createHash } from 'node:crypto';
+import { SUB_CODES, TAB_SUBS, DEFAULT_SUB, isSub, subByRules } from './subs.mjs';
 
 export const WINDOW_HOURS = 48;        // новини старші за це не показуємо
 export const FAKES_WINDOW_HOURS = 168;  // спростування виходять рідше й лишаються актуальними довше — тиждень
@@ -10,7 +11,8 @@ export const CLUSTER_GAP_HOURS = 36;   // максимум між двома п�
 export const SIM_THRESHOLD = 0.5;      // поріг схожості заголовків
 export const PER_FEED_LIMIT = 30;      // беремо не більше N найсвіжіших з кожної стрічки
 export const MAX_RAW_ITEMS = 300;      // більше сирих записів з однієї стрічки не розбираємо
-export const PER_TAB_LIMIT = 80;
+export const PER_TAB_LIMIT = 80;       // стеля на рубрику «Усе»… (див. assemble): без рубрик це був ліміт вкладки
+export const PER_SUB_LIMIT = 40;       // не більше N новин на одну рубрику у вкладці
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -254,6 +256,27 @@ export function topicOf(msgs) {
   return 'world';
 }
 
+// ---------- рубрика (підкатегорія) новини ----------
+// Порядок рішення (рішення Романа 25.11.2026: правила + ШІ для всіх текстів):
+//   1) тематична стрічка видання (sources.json: "sub": "sport") — найнадійніша ознака: спортивна стрічка пише про спорт;
+//   2) мітка ШІ (cls): для іноземних текстів її дає перекладач, для українських — окремий класифікатор; береться
+//      найчастіша серед повідомлень кластера;
+//   3) правила за словами (subs.mjs) по заголовках і описах — в оригіналі й у перекладі;
+//   4) технологічні заголовки (isTech) → «ІТ та ШІ»;
+//   5) решта → «Суспільство».
+export function subOf(msgs) {
+  const fromFeed = msgs.map((m) => m.source?.sub).find(isSub);
+  if (fromFeed) return fromFeed;
+  const votes = new Map();
+  for (const m of msgs) if (isSub(m.cls)) votes.set(m.cls, (votes.get(m.cls) ?? 0) + 1);
+  if (votes.size) return [...votes.entries()].sort((a, b) => b[1] - a[1] || SUB_CODES.indexOf(a[0]) - SUB_CODES.indexOf(b[0]))[0][0];
+  const text = msgs.flatMap((m) => [m.title, m.titleUk, m.summary, m.summaryUk]).filter(Boolean).join(' \n ');
+  const byTitle = subByRules(msgs.flatMap((m) => [m.title, m.titleUk]).filter(Boolean).join(' \n '));
+  if (byTitle) return byTitle;
+  if (msgs.some((m) => isTech(m.title) || (m.titleUk && isTech(m.titleUk)))) return 'tech';
+  return subByRules(text) ?? DEFAULT_SUB;
+}
+
 // ---------- кластеризація ----------
 const INDEPENDENT_TYPES = new Set(['independent', 'public', 'exile']);
 
@@ -317,7 +340,9 @@ export function buildStory(members, srcMap, now = Date.now()) {
   const cats = new Set([...srcCats].filter((c) => c !== 'ukraine' && c !== 'world'));
   const topic = topicOf(withSrc);
   if (topic === 'ukraine' || srcCats.has('ukraine') || srcCats.has('world')) cats.add(topic);
-  if (withSrc.some((m) => isTech(m.title) || (m.titleUk && isTech(m.titleUk)))) cats.add('tech');
+  const sub = subOf(withSrc);
+  // Розділ «Техно та ШІ» — усе про ІТ і ШІ з усього світу: технологічні стрічки, технологічні заголовки й рубрика «ІТ та ШІ».
+  if (sub === 'tech' || withSrc.some((m) => isTech(m.title) || (m.titleUk && isTech(m.titleUk)))) cats.add('tech');
   const ageH = Math.max(0, (now - lastTs) / 3600e3);
   const trustMax = Math.max(...withSrc.map((m) => m.source.trust));
   const score = Math.round(
@@ -331,7 +356,7 @@ export function buildStory(members, srcMap, now = Date.now()) {
     url: lead.url, ts: firstTs, lastTs,
     status, confirmations: independent.size, clickbait,
     translated: !!lead.titleUk,
-    cats: [...cats], score,
+    cats: [...cats], sub, score,
     sources: withSrc.sort((a, b) => a.ts - b.ts).map((m) => ({
       id: m.src, name: m.source.name, type: m.source.type, lang: m.lang,
       url: m.url, title: m.title, ts: m.ts,
@@ -346,10 +371,18 @@ export function assemble(items, sources, now = Date.now()) {
   const stories = clusterItems(news).map((g) => buildStory(g, srcMap, now));
   stories.sort((a, b) => b.score - a.score || b.lastTs - a.lastTs);
   const tabs = { ukraine: [], world: [], tech: [], fakes: [] };
+  // «Україна» і «Світ» мають рубрики: кожна рубрика отримує до PER_SUB_LIMIT найкращих новин, щоб спорт чи авто
+  // не витіснялися політикою; «Усе» у вкладці — об'єднання рубрик за рейтингом. «Техно» — без рубрик, як раніше.
+  const perSub = { ukraine: new Map(), world: new Map() };
   for (const s of stories) {
-    for (const c of ['ukraine', 'world', 'tech']) {
-      if (s.cats.includes(c) && tabs[c].length < PER_TAB_LIMIT) tabs[c].push(s.id);
+    for (const c of ['ukraine', 'world']) {
+      if (!s.cats.includes(c)) continue;
+      const counts = perSub[c];
+      const key = TAB_SUBS[c].includes(s.sub) ? s.sub : '_other';
+      const n = counts.get(key) ?? 0;
+      if (n < PER_SUB_LIMIT) { counts.set(key, n + 1); tabs[c].push(s.id); }
     }
+    if (s.cats.includes('tech') && tabs.tech.length < PER_TAB_LIMIT) tabs.tech.push(s.id);
   }
   const fakeStories = facts.sort((a, b) => b.ts - a.ts).slice(0, PER_TAB_LIMIT).map((f) => {
     const s = srcMap.get(f.src);

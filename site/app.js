@@ -14,13 +14,19 @@
     exile: 'незалежне ЗМІ у вигнанні', factcheck: 'фактчекери'
   };
   var LANG_LABEL = { uk: 'українською', en: 'англійською', ru: 'російською' };
+  // Рубрики (підкатегорії) у розділах «Україна» і «Світ». Коди й порядок — як у pipeline/subs.mjs.
+  var SUBS = { war: 'Війна', politics: 'Політика', economy: 'Економіка', society: 'Суспільство', sport: 'Спорт', tech: 'ІТ та ШІ', auto: 'Авто', fun: 'Трохи сміху', garden: 'Сад і город' };
+  var TAB_SUBS = {
+    ukraine: ['war', 'politics', 'economy', 'society', 'sport', 'tech', 'auto', 'fun', 'garden'],
+    world: ['war', 'politics', 'economy', 'society', 'sport', 'auto', 'fun']
+  };
   var REFRESH_MS = 10 * 60 * 1000;
   // Пошта для звернень і повідомлень про помилки. Порожньо — блок контактів не показується.
   // Заповнити, щойно з'явиться окрема пошта Syto (потрібна до виходу в Google Play).
   var CONTACT_EMAIL = '';
 
   var $ = function (id) { return document.getElementById(id); };
-  var state = { data: null, tab: 'ukraine', filter: 'all', offline: false, loadedAt: 0 };
+  var state = { data: null, tab: 'ukraine', filter: 'all', sub: {}, offline: false, loadedAt: 0 };
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
@@ -165,7 +171,8 @@
     var names = [];
     story.sources.forEach(function (s) { if (names.indexOf(s.name) < 0) names.push(s.name); });
     var shown = names.slice(0, 2).join(', ') + (names.length > 2 ? ' та ще ' + (names.length - 2) : '');
-    li.appendChild(el('p', 'meta', shown + ' · ' + ago(story.lastTs || story.ts, now) + (story.translated ? ' · переклад ШІ' : '')));
+    var subName = story.sub && SUBS[story.sub] && TAB_SUBS[state.tab] ? SUBS[story.sub] + ' · ' : '';
+    li.appendChild(el('p', 'meta', subName + shown + ' · ' + ago(story.lastTs || story.ts, now) + (story.translated ? ' · переклад ШІ' : '')));
 
     var det = el('details');
     det.appendChild(el('summary', null, story.sources.length > 1 ? 'Хто про це пише (' + story.sources.length + ')' : 'Першоджерело'));
@@ -183,12 +190,31 @@
     return li;
   }
 
+  /** Ряд кнопок-рубрик для вкладки: «Усе» + рубрики розділу. Поточний вибір — state.sub[tab] ('all' або код). */
+  function renderSubs() {
+    var box = $('subs'), tab = state.tab, subs = TAB_SUBS[tab];
+    box.textContent = '';
+    box.hidden = !subs;
+    if (!subs) return;
+    var cur = state.sub[tab] || 'all';
+    ['all'].concat(subs).forEach(function (code) {
+      var b = el('button', 'chip sub', code === 'all' ? 'Усе' : SUBS[code]);
+      b.type = 'button';
+      b.setAttribute('data-sub', code);
+      b.setAttribute('aria-pressed', String(code === cur));
+      box.appendChild(b);
+    });
+    var active = box.querySelector('[aria-pressed="true"]');
+    if (active && active.scrollIntoView) { try { active.scrollIntoView({ block: 'nearest', inline: 'center' }); } catch (e) { /* старі браузери */ } }
+  }
+
   function renderFeed() {
     var d = state.data, tab = state.tab, now = Date.now();
     $('view-title').textContent = TABS[tab].title;
     $('view-hint').textContent = TABS[tab].hint;
     $('filters').hidden = tab === 'fakes';
-    Array.prototype.forEach.call(document.querySelectorAll('.chip'), function (c) {
+    renderSubs();
+    Array.prototype.forEach.call(document.querySelectorAll('#filters .chip'), function (c) {
       c.setAttribute('aria-pressed', String(c.getAttribute('data-filter') === state.filter));
     });
     var list = $('list'), empty = $('empty');
@@ -197,6 +223,8 @@
     var byId = {};
     d.stories.forEach(function (s) { byId[s.id] = s; });
     var items = (d.tabs[tab] || []).map(function (id) { return byId[id]; }).filter(Boolean);
+    var sub = TAB_SUBS[tab] ? (state.sub[tab] || 'all') : 'all';
+    if (sub !== 'all') items = items.filter(function (s) { return s.sub === sub; });
     if (tab !== 'fakes' && state.filter === 'confirmed') items = items.filter(function (s) { return s.status === 'confirmed'; });
     var frag = document.createDocumentFragment();
     items.forEach(function (s) { frag.appendChild(card(s, now)); });
@@ -204,7 +232,9 @@
     empty.hidden = items.length > 0;
     if (!items.length) empty.textContent = state.filter === 'confirmed' && tab !== 'fakes'
       ? 'Зараз немає новин, підтверджених кількома джерелами. Натисніть «Усі новини».'
-      : 'Тут поки порожньо. Новини оновлюються чотири рази на день.';
+      : sub !== 'all'
+        ? 'У рубриці «' + SUBS[sub] + '» зараз порожньо. Новини оновлюються чотири рази на день; натисніть «Усе», щоб бачити весь розділ.'
+        : 'Тут поки порожньо. Новини оновлюються чотири рази на день.';
   }
 
   function renderMethod() {
@@ -230,6 +260,8 @@
     });
     box.appendChild(lg);
 
+    box.appendChild(el('h3', null, 'Рубрики'));
+    box.appendChild(el('p', null, 'У розділах «Україна» і «Світ» новини розкладені за рубриками: війна, політика, економіка, суспільство, спорт, авто, трохи сміху, а в «Україні» ще ІТ та ШІ і сад і город. Рубрику визначає тематична стрічка видання, інакше — ШІ за заголовком, а якщо його немає — правила за ключовими словами. «Трохи сміху» — лише справжні курйозні новини від редакцій, без сатири. Розділ «Техно та ШІ» збирає новини ІТ і штучного інтелекту з усього світу, «Фейки» — лише спростування фактчекерів.'));
     box.appendChild(el('h3', null, 'Як відбувається просіювання'));
     var ol = el('ol');
     ['Чотири рази на день (до 8:00, 12:00, 16:00 і 20:00 за Києвом) Syto забирає свіжі заголовки зі стрічок усіх редакцій зі списку нижче.',
@@ -273,7 +305,7 @@
           dot.setAttribute('role', 'img'); dot.setAttribute('aria-label', ok ? 'на зв’язку' : 'не відповідає');
           li.appendChild(dot);
           var t = el('div'); t.appendChild(el('span', null, s.name));
-          t.appendChild(el('small', null, (TYPE_LABEL[s.type] || s.type) + ' · ' + (LANG_LABEL[s.lang] || s.lang) + (ok ? '' : ' · зараз не відповідає')));
+          t.appendChild(el('small', null, (TYPE_LABEL[s.type] || s.type) + ' · ' + (LANG_LABEL[s.lang] || s.lang) + (s.sub && SUBS[s.sub] ? ' · ' + SUBS[s.sub] : '') + (ok ? '' : ' · зараз не відповідає')));
           li.appendChild(t); ul.appendChild(li);
         });
         box.appendChild(ul);
@@ -346,6 +378,16 @@
   }
 
   state.filter = store('syto-filter') === 'confirmed' ? 'confirmed' : 'all';
+  try { state.sub = JSON.parse(store('syto-sub') || '{}') || {}; } catch (e) { state.sub = {}; }
+  if (typeof state.sub !== 'object' || Array.isArray(state.sub)) state.sub = {};
+  $('subs').addEventListener('click', function (e) {
+    var c = e.target.closest ? e.target.closest('.sub') : null;
+    if (!c) return;
+    state.sub[state.tab] = c.getAttribute('data-sub');
+    store('syto-sub', JSON.stringify(state.sub));
+    renderFeed();
+    window.scrollTo(0, 0);
+  });
   $('filters').addEventListener('click', function (e) {
     var c = e.target.closest ? e.target.closest('.chip') : null;
     if (!c) return;

@@ -17,7 +17,7 @@ async function run(env = {}, fetchOpts = {}, dir) {
   await writeFile(sourcesPath, JSON.stringify({ sources: demoSources }));
   const fetchImpl = demoFetch(NOW, fetchOpts);
   const logs = [];
-  const r = await build({ sourcesPath, outPath: join(dir, 'out/news.json'), cachePath: join(dir, 'cache/tr.json'), storePath: join(dir, 'cache/items.json'), retryPauseMs: 0, env, fetchImpl, now: NOW, log: (l) => logs.push(l) });
+  const r = await build({ sourcesPath, outPath: join(dir, 'out/news.json'), cachePath: join(dir, 'cache/tr.json'), classesPath: join(dir, 'cache/classes.json'), storePath: join(dir, 'cache/items.json'), retryPauseMs: 0, env, fetchImpl, now: NOW, log: (l) => logs.push(l) });
   return { ...r, dir, fetchImpl, logs };
 }
 const byTitle = (data, part) => data.stories.find((s) => s.title.includes(part));
@@ -230,8 +230,9 @@ for (const [name, env] of [['Gemini', { GEMINI_API_KEY: 'test' }], ['Anthropic',
 }
 
 test('ЗБІРКА: пауза перекладу (TRANSLATE_MAX_NEW=0) не робить платних викликів', async () => {
-  const r = await run({ ANTHROPIC_API_KEY: 'test', TRANSLATE_MAX_NEW: '0' });
+  const r = await run({ ANTHROPIC_API_KEY: 'test', TRANSLATE_MAX_NEW: '0', CLASSIFY_MAX_NEW: '0' });
   assert.equal(r.fetchImpl.calls.translate, 0);
+  assert.equal(r.fetchImpl.calls.classify, 0);
   assert.equal(r.data.stats.translation.translated, 0);
   assert.ok(r.written);
 });
@@ -249,7 +250,7 @@ test('ЗБІРКА: якщо впали майже всі стрічки — с�
   await writeFile(sourcesPath, JSON.stringify({ sources: demoSources }));
   const outPath = join(dir, 'news.json');
   await writeFile(outPath, '{"keep":true}');
-  const r = await build({ sourcesPath, outPath, cachePath: join(dir, 'c.json'), storePath: join(dir, 'i.json'), retryPauseMs: 0, env: {}, fetchImpl: async () => { throw new Error('мережі немає'); }, now: NOW, log: () => {} });
+  const r = await build({ sourcesPath, outPath, cachePath: join(dir, 'c.json'), classesPath: join(dir, 'cl.json'), storePath: join(dir, 'i.json'), retryPauseMs: 0, env: {}, fetchImpl: async () => { throw new Error('мережі немає'); }, now: NOW, log: () => {} });
   assert.equal(r.written, false);
   assert.equal(await readFile(outPath, 'utf8'), '{"keep":true}');
 });
@@ -483,4 +484,108 @@ test('fixMixed: латинські двійники виправляє, зіпс
   assert.equal(fixMixed('x', 'треба переклbasти').bad, true);
   assert.equal(fixMixed('iPhoneом', 'з iPhoneом').t, 'з iPhoneом');
   assert.deepEqual(fixMixed('x', 'Apple і Google'), { t: 'Apple і Google', bad: false });
+});
+
+// ---------- рубрики (підкатегорії), 25.11.2026 ----------
+import { subOf, assemble, PER_SUB_LIMIT } from '../pipeline/lib.mjs';
+import { subByRules, SUBS, TAB_SUBS } from '../pipeline/subs.mjs';
+import { parseClasses, classifyItems } from '../pipeline/translate.mjs';
+
+test('РУБРИКИ: правила за словами розпізнають війну, політику, економіку, спорт, авто, сад', () => {
+  assert.equal(subByRules('Росіяни вдарили ракетами по Харкову, є поранені'), 'war');
+  assert.equal(subByRules('Верховна Рада ухвалила законопроєкт про бюджет'), 'politics');
+  assert.equal(subByRules('Нацбанк підвищив облікову ставку, курс долара зріс'), 'economy');
+  assert.equal(subByRules('«Шахтар» переміг «Динамо» у фіналі Кубка України'), 'sport');
+  assert.equal(subByRules('Tesla cuts prices of its electric vehicles in Europe'), 'auto');
+  assert.equal(subByRules('Коли садити часник під зиму: поради городникам'), 'garden');
+  assert.equal(subByRules('У місті відкрили новий дитячий майданчик'), null);
+  assert.equal(subByRules('Trump won the election by a wide margin'), 'politics', '«won» не робить політику спортом');
+  assert.equal(subByRules('Мер Садовий відкрив нову школу'), null, 'прізвище Садовий — не сад');
+  // війна перша: удар по ракетному заводу — війна, навіть якщо згадано уряд
+  assert.equal(subByRules('Уряд повідомив про наслідки ракетного удару'), 'war');
+});
+
+test('РУБРИКИ: subOf — тематична стрічка > мітка ШІ > правила > техно > суспільство', () => {
+  const src = (sub) => ({ id: 's', cat: 'ukraine', type: 'independent', trust: 3, ...(sub ? { sub } : {}) });
+  assert.equal(subOf([{ title: 'Уряд ухвалив бюджет', source: src('sport') }]), 'sport', 'стрічка видання важливіша за слова');
+  assert.equal(subOf([{ title: 'Уряд ухвалив бюджет', cls: 'economy', source: src() }]), 'economy', 'мітка ШІ важливіша за правила');
+  assert.equal(subOf([{ title: 'x', cls: 'war', source: src() }, { title: 'x', cls: 'politics', source: src() }, { title: 'x', cls: 'politics', source: src() }]), 'politics', 'більшість голосів');
+  assert.equal(subOf([{ title: 'Уряд ухвалив бюджет', source: src() }]), 'politics', 'правила');
+  assert.equal(subOf([{ title: 'Demo lab unveils open AI model', source: src() }]), 'tech', 'технологічний заголовок');
+  assert.equal(subOf([{ title: 'У місті відкрили дитячий майданчик', source: src() }]), 'society', 'решта — суспільство');
+  assert.equal(subOf([{ title: 'Headline', titleUk: 'Збірна України вийшла у фінал чемпіонату', source: src() }]), 'sport', 'правила бачать і переклад');
+  assert.equal(subOf([{ title: 'x', cls: 'nonsense', source: src() }]), 'society', 'невідома мітка ігнорується');
+});
+
+test('РУБРИКИ: parseEntries приймає поле c, невідомий код відкидає; parseClasses — лише коди', () => {
+  const e = parseEntries('[{"t":"Переклад один","c":"war"},{"t":"Переклад два","c":"xyz"},"Переклад три"]', 3);
+  assert.deepEqual(e.map((x) => x.c), ['war', undefined, undefined]);
+  assert.deepEqual(parseClasses('Ось: ["war"," Sport ", "nope", 5]', 4), ['war', 'sport', null, null]);
+  assert.throws(() => parseClasses('["war"]', 2));
+});
+
+test('РУБРИКИ: classifyItems — кеш, пакети з одного джерела, збій не валить, безнадійні запам’ятовуються', async () => {
+  const items = [];
+  for (const src of ['a', 'b']) for (let i = 0; i < 3; i++) items.push({ id: src + i, src, lang: 'uk', title: `Заголовок ${i} із джерела ${src}` });
+  items.push({ id: 'done', src: 'a', lang: 'en', title: 'Already tagged', cls: 'auto' });
+  const seen = [];
+  const provider = { name: 'fake', classifyModel: 'm', apiKey: 'k', call: async (batch, opts) => { seen.push({ batch, system: opts.system }); return JSON.stringify(batch.map((t) => (t.includes('джерела a') ? 'war' : 'garbage'))); } };
+  const cache = {};
+  const st = await classifyItems(items, cache, { provider, now: NOW });
+  assert.equal(seen.length, 2, 'два джерела — два пакети');
+  assert.ok(seen.every((s) => s.system.includes('JSON-масив кодів')), 'власний системний промпт класифікатора');
+  assert.equal(st.classified, 3); assert.equal(st.failed, 3);
+  assert.ok(items.filter((i) => i.src === 'a' && i.lang === 'uk').every((i) => i.cls === 'war'));
+  assert.ok(items.filter((i) => i.src === 'b').every((i) => !i.cls), 'невідомий код → без мітки');
+  assert.equal(items.find((i) => i.id === 'done').cls, 'auto', 'вже помічене не чіпаємо');
+  // другий прогін: усе з кешу, жодного виклику; безнадійні (2 провали) більше не питаємо
+  const fresh = items.map((i) => (i.id === 'done' ? i : { ...i, cls: undefined }));
+  const st2 = await classifyItems(fresh, cache, { provider, now: NOW });
+  assert.equal(seen.length, 3, 'лише пакет джерела b (перший провал ще не безнадійний)');
+  assert.equal(st2.fromCache, 3);
+  const st3 = await classifyItems(items.map((i) => (i.id === 'done' ? i : { ...i, cls: undefined })), cache, { provider, now: NOW });
+  assert.equal(seen.length, 3, 'після двох провалів тексти з b не йдуть у платний запит');
+  assert.equal(st3.skipped, 0);
+  // збій постачальника
+  const bad = { name: 'fake', classifyModel: 'm', apiKey: 'k', call: async () => { throw new Error('Anthropic HTTP 529'); } };
+  const st4 = await classifyItems([{ id: 'z', src: 'c', lang: 'uk', title: 'Ще один заголовок' }], {}, { provider: bad, now: NOW });
+  assert.equal(st4.failed, 1);
+});
+
+test('РУБРИКИ: assemble — кожна новина «України»/«Світу» має sub, стеля на рубрику, «Техно» як раніше', () => {
+  const sources = [
+    { id: 'u', name: 'U', lang: 'uk', country: 'UA', cat: 'ukraine', type: 'independent', trust: 3 },
+    { id: 'u2', name: 'U2', lang: 'uk', country: 'UA', cat: 'ukraine', type: 'independent', trust: 3 },
+    { id: 'sp', name: 'Спорт', lang: 'uk', country: 'UA', cat: 'ukraine', sub: 'sport', type: 'independent', trust: 3 },
+  ];
+  const items = [];
+  for (let i = 0; i < PER_SUB_LIMIT + 5; i++) items.push({ id: 'w' + i, src: 'u', lang: 'uk', title: `Ракетний удар по місту номер ${i} ${'слово'.repeat(i % 3)}`, summary: '', url: 'https://u.example/' + i, ts: NOW - i * 60e3 });
+  for (let i = 0; i < 3; i++) items.push({ id: 's' + i, src: 'sp', lang: 'uk', title: `Матч туру номер ${i} завершився внічию`, summary: '', url: 'https://sp.example/' + i, ts: NOW - i * 60e3 });
+  items.push({ id: 'oth', src: 'u2', lang: 'uk', title: 'У місті відкрили дитячий майданчик', summary: '', url: 'https://u2.example/x', ts: NOW });
+  for (const it of items) it.cmp = it.title;
+  const { tabs, stories } = assemble(items, sources, NOW);
+  const byId = new Map(stories.map((s) => [s.id, s]));
+  const ua = tabs.ukraine.map((id) => byId.get(id));
+  assert.ok(ua.every((s) => Object.prototype.hasOwnProperty.call(SUBS, s.sub)), 'у кожної новини є код рубрики');
+  assert.equal(ua.filter((s) => s.sub === 'war').length, PER_SUB_LIMIT, 'війна впирається у стелю рубрики');
+  assert.equal(ua.filter((s) => s.sub === 'sport').length, 3, 'спорт не витіснений війною');
+  assert.equal(ua.find((s) => s.id === 'oth').sub, 'society');
+  assert.ok(TAB_SUBS.ukraine.includes('garden') && !TAB_SUBS.world.includes('garden'));
+});
+
+test('ЗБІРКА: рубрики доходять до news.json, кеш рубрик пишеться й читається без платних викликів', async () => {
+  const r = await run({ ANTHROPIC_API_KEY: 'test' });
+  const classes = JSON.parse(await readFile(join(r.dir, 'cache/classes.json'), 'utf8'));
+  assert.ok(Object.keys(classes).length > 0, 'кеш рубрик записано');
+  assert.ok(r.fetchImpl.calls.classify > 0);
+  assert.equal(r.data.stats.classification.failed, 0);
+  const train = byTitle(r.data, 'приміської електрички');
+  assert.equal(train.sub, 'economy', 'мітка ШІ (тестовий класифікатор) потрапила в картку');
+  assert.equal(byTitle(r.data, 'розклад дзвінків').sub, 'society');
+  assert.ok(byTitle(r.data, 'модель ШІ').cats.includes('tech'));
+  for (const id of [...r.data.tabs.ukraine, ...r.data.tabs.world]) assert.ok(SUBS[r.data.stories.find((s) => s.id === id).sub]);
+  // другий запуск із тим самим кешем: класифікатор не викликається
+  const r2 = await run({ ANTHROPIC_API_KEY: 'test' }, {}, r.dir);
+  assert.equal(r2.fetchImpl.calls.classify, 0);
+  assert.equal(r2.data.stats.classification.fromCache, r.data.stats.classification.classified + r.data.stats.classification.fromCache);
 });

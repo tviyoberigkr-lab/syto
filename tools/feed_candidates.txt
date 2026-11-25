@@ -1,0 +1,59 @@
+# Кандидати на стрічки для рубрик (25.11.2026). Перевіряє workflow «Перевірка стрічок» або node tools/check_feeds.mjs.
+# Робочі переносяться в sources.json із полем "sub"; решта лишається тут із позначкою, чому ні.
+# --- спорт, Україна ---
+https://champion.com.ua/rss/view_news/
+https://champion.com.ua/rss/
+https://sport.ua/uk/rss
+https://sport.ua/rss
+https://ua.tribuna.com/rss/
+https://football.ua/rss2.ashx
+https://www.ua-football.com/rss.xml
+https://suspilne.media/sport/rss/
+https://isport.ua/rss
+# --- спорт, світ ---
+https://feeds.bbci.co.uk/sport/rss.xml
+https://feeds.bbci.co.uk/sport/football/rss.xml
+https://www.theguardian.com/uk/sport/rss
+https://www.skysports.com/rss/12040
+https://www.espn.com/espn/rss/news
+# --- авто, Україна ---
+https://www.autocentre.ua/rss
+https://www.autocentre.ua/feed
+https://autogeek.ua/feed/
+https://www.infocar.ua/rss/
+https://auto.24tv.ua/rss/all.xml
+https://auto.ria.com/uk/news/rss/
+https://focus.ua/uk/auto/rss
+# --- авто, світ ---
+https://www.autocar.co.uk/rss
+https://electrek.co/feed/
+https://www.caranddriver.com/rss/all.xml/
+https://www.theguardian.com/technology/motoring/rss
+https://www.autoblog.com/rss.xml
+https://www.autonews.com/rss.xml
+# --- курйози (справжні новини), світ ---
+https://rss.upi.com/news/odd_news.rss
+https://www.huffpost.com/section/weird-news/feed
+https://feeds.bbci.co.uk/news/also_in_the_news/rss.xml
+https://www.theguardian.com/lifeandstyle/series/oddly-enough/rss
+https://www.cbc.ca/webfeed/rss/rss-offbeat
+# --- курйози, Україна ---
+https://rss.unian.ua/site/news_kuryozy.rss
+https://rss.unian.ua/site/news_curiosities.rss
+https://www.unian.ua/rss/curiosities
+https://gazeta.ua/rss/curious
+https://nv.ua/ukr/rss/life.xml
+# --- сад і город, Україна ---
+https://sadigorod.org/feed/
+https://ukr.media/feed/
+https://superagronom.com/rss
+https://superagronom.com/feed
+https://agroportal.ua/feed
+https://agroportal.ua/rss
+https://agravery.com/uk/rss
+https://www.unian.ua/rss/agro
+https://tsn.ua/rss/full-feed/lady/dacha.rss
+https://zelenasadyba.com.ua/feed/
+https://ogorodnik.in.ua/feed/
+https://dachnik.in.ua/feed/
+https://sad.in.ua/feed/

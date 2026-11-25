@@ -19,6 +19,12 @@ export const demoSources = [
   { id: 'd-down', name: 'Демо: сайт лежить', feed: 'https://demo.invalid/down.rss', lang: 'uk', country: 'UA', cat: 'ukraine', type: 'independent', trust: 2 },
 ];
 
+// Рубрики, які тестовий «класифікатор» дає українським заголовкам (решта — society).
+export const demoClasses = {
+  'Демо: в області запрацював новий маршрут приміської електрички': 'economy',
+  'Демо: школи області переходять на новий розклад дзвінків': 'society',
+};
+
 // Словник для тестового «перекладача» (справжній переклад робить AI за ключем).
 export const demoTranslations = {
   'Demo: island nation opens new undersea cable link': 'Демо: острівна держава відкрила нову підводну кабельну лінію',
@@ -130,16 +136,21 @@ function encode1251(str) {
  *  Елемент словника — рядок або {t, g} (переклад із термінами), як у справжній відповіді моделі. */
 export function demoFetch(now = Date.now(), { translatorFails = false, failFeeds = [] } = {}) {
   const feeds = demoFeeds(now);
-  const calls = { feeds: 0, translate: 0 };
+  const calls = { feeds: 0, translate: 0, classify: 0 };
   const impl = async (url, opts = {}) => {
     url = String(url);
     if (url.includes('anthropic.com') || url.includes('googleapis.com')) {
-      calls.translate++;
-      if (translatorFails) return new Response('overloaded', { status: 529 });
+      if (translatorFails) { calls.translate++; return new Response('overloaded', { status: 529 }); }
       const body = JSON.parse(opts.body);
+      const system = body.system ?? body.systemInstruction?.parts?.[0]?.text ?? '';
       const prompt = body.messages?.[0]?.content ?? body.contents?.[0]?.parts?.[0]?.text;
       const titles = JSON.parse(prompt.slice(prompt.indexOf('<texts>') + 7, prompt.lastIndexOf('</texts>')));
-      const out = JSON.stringify(titles.map((t) => demoTranslations[t] ?? `[uk] ${t}`));
+      // Класифікатор рубрик (українські заголовки) відрізняється системним промптом: відповідь — лише коди.
+      const isClassify = system.includes('JSON-масив кодів');
+      calls[isClassify ? 'classify' : 'translate']++;
+      const out = isClassify
+        ? JSON.stringify(titles.map((t) => demoClasses[t] ?? 'society'))
+        : JSON.stringify(titles.map((t) => demoTranslations[t] ?? `[uk] ${t}`));
       const payload = url.includes('anthropic.com') ? { content: [{ type: 'text', text: 'Ось переклад:\n' + out }] } : { candidates: [{ content: { parts: [{ text: out }] } }] };
       return new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/json' } });
     }

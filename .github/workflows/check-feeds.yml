@@ -1,0 +1,29 @@
+# Syto — перевірка стрічок із середовища GitHub (деякі сайти відмовляють саме запитам звідси). CoLaba Production
+# Запуск: Actions → «Перевірка стрічок» → Run workflow. Нічого не змінює й не публікує — лише друкує таблицю в журнал.
+name: Перевірка стрічок
+
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: 'Адреси через пробіл (порожньо — усі з sources.json і tools/feed_candidates.txt)'
+        required: false
+        default: ''
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Перевірка
+        run: node tools/check_feeds.mjs ${{ inputs.urls }}

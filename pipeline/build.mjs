@@ -5,7 +5,7 @@ import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseFeed, normalizeItems, assemble, windowFor } from './lib.mjs';
-import { translateItems, pickProvider } from './translate.mjs';
+import { translateItems, classifyItems, pickProvider } from './translate.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const UA = 'Mozilla/5.0 (compatible; SytoNewsBot/1.0; +https://tviyoberigkr-lab.github.io/syto/)';
@@ -34,6 +34,7 @@ export async function build({
   sourcesPath = resolve(ROOT, 'sources.json'),
   outPath = resolve(ROOT, 'site/data/news.json'),
   cachePath = resolve(ROOT, 'data/translations.json'),
+  classesPath = resolve(ROOT, 'data/classes.json'),
   storePath = resolve(ROOT, 'data/items.json'),
   retryPauseMs = 5000,
   env = process.env, fetchImpl = fetch, now = Date.now(), timeoutMs = 20000, log = console.log,
@@ -75,13 +76,19 @@ export async function build({
   try { cache = JSON.parse(await readFile(cachePath, 'utf8')); } catch { /* першого разу кешу ще немає */ }
   const tr = await translateItems(items, cache, { provider: pickProvider(env), maxNew: env.TRANSLATE_MAX_NEW === undefined || env.TRANSLATE_MAX_NEW === '' ? 400 : Number(env.TRANSLATE_MAX_NEW), fetchImpl, now });
   for (const it of items) it.cmp = it.titleUk || it.title;
+  // Рубрики для текстів без мітки (українські заголовки): окремий дешевий класифікатор, кеш — data/classes.json.
+  let classes = {};
+  try { classes = JSON.parse(await readFile(classesPath, 'utf8')); } catch { /* першого разу кешу ще немає */ }
+  const provider = pickProvider(env);
+  const cl = await classifyItems(items, classes, { provider, maxNew: env.CLASSIFY_MAX_NEW === undefined || env.CLASSIFY_MAX_NEW === '' ? 400 : Number(env.CLASSIFY_MAX_NEW), fetchImpl, now });
 
   const { tabs, stories } = assemble(items, sources, now);
   const okFeeds = health.filter((h) => h.ok).length;
   const data = {
     generatedAt: new Date(now).toISOString(),
-    stats: { feedsOk: okFeeds, feedsTotal: sources.length, items: items.length, stories: stories.length, translation: { provider: tr.provider, translated: tr.translated, fromCache: tr.fromCache, failed: tr.failed, pending: tr.skipped } },
-    sources: sources.map(({ id, name, type, lang, country, cat, trust, group }) => ({ id, name, type, lang, country, cat, trust, ...(group ? { group } : {}) })),
+    stats: { feedsOk: okFeeds, feedsTotal: sources.length, items: items.length, stories: stories.length, translation: { provider: tr.provider, translated: tr.translated, fromCache: tr.fromCache, failed: tr.failed, pending: tr.skipped },
+      classification: { provider: cl.provider, classified: cl.classified, fromCache: cl.fromCache, failed: cl.failed, pending: cl.skipped } },
+    sources: sources.map(({ id, name, type, lang, country, cat, sub, trust, group }) => ({ id, name, type, lang, country, cat, ...(sub ? { sub } : {}), trust, ...(group ? { group } : {}) })),
     health, tabs, stories,
   };
 
@@ -96,6 +103,8 @@ export async function build({
   await rename(outPath + '.tmp', outPath);
   await mkdir(dirname(cachePath), { recursive: true });
   await writeFile(cachePath, JSON.stringify(cache));
+  await mkdir(dirname(classesPath), { recursive: true });
+  await writeFile(classesPath, JSON.stringify(classes));
   await mkdir(dirname(storePath), { recursive: true });
   await writeFile(storePath, storeSnapshot);
 
@@ -105,6 +114,9 @@ export async function build({
   if (tr.rejected) log(`  переклад: відхилено перевіркою правдоподібності ${tr.rejected} — лишились в оригіналі.`);
   for (const n of tr.notes) log(`  УВАГА: ${n}`);
   for (const e of tr.errors.slice(0, 3)) log(`  переклад: ${e}`);
+  log(`Рубрики: ${cl.provider ?? 'лише правила (немає ключа)'}; нових ${cl.classified}, з кешу ${cl.fromCache}, помилок ${cl.failed}, у черзі ${cl.skipped}.`);
+  if (cl.usage.calls) log(`Токени рубрик (${cl.model}): запитів ${cl.usage.calls}, вхід ${cl.usage.input}, вихід ${cl.usage.output}.`);
+  for (const e of cl.errors.slice(0, 3)) log(`  рубрики: ${e}`);
   for (const h of health.filter((x) => !x.ok)) log(`  ✗ ${h.name}: ${h.error}`);
   for (const h of health.filter((x) => x.ok && !x.items)) log(`  ⚠ ${h.name}: стрічка відповіла, але свіжих записів 0 (відкинуто ${h.dropped ?? 0})`);
   return { written: true, data };

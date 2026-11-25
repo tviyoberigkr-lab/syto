@@ -1,10 +1,10 @@
 {
-  "_comment": "group — редакційна група: видання однієї групи (наприклад, «Українська правда» і «Європейська правда») рахуються як ОДНЕ незалежне підтвердження. Список джерел. type: independent | public (суспільний мовник) | state (державне ЗМІ) | exile (незалежне ЗМІ у вигнанні) | factcheck. trust 1-3. Державні ЗМІ не зараховуються як незалежне підтвердження. Щоб вимкнути джерело — постав \"enabled\": false.",
+  "_comment": "group — редакційна група: видання однієї групи (наприклад, «Українська правда» і «Європейська правда») рахуються як ОДНЕ незалежне підтвердження. Список джерел. type: independent | public (суспільний мовник) | state (державне ЗМІ) | exile (незалежне ЗМІ у вигнанні) | factcheck. trust 1-3. Державні ЗМІ не зараховуються як незалежне підтвердження. Щоб вимкнути джерело — постав \"enabled\": false. sub — рубрика тематичної стрічки (sport | auto | fun | garden): усі її новини йдуть у цю рубрику.",
   "sources": [
     {"id": "suspilne", "enabled": false, "note": "21.11.2026: стабільно відмовляє запитам із GitHub (403). Повернути можна через запити з комп’ютера Романа", "name": "Суспільне Новини", "feed": "https://suspilne.media/rss/all.rss", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "public", "trust": 3},
     {"id": "pravda", "group": "up", "name": "Українська правда", "feed": "https://www.pravda.com.ua/rss/view_news/", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
     {"id": "liga", "enabled": false, "note": "21.11.2026: стабільно відмовляє запитам із GitHub (403)", "name": "LIGA.net", "feed": "https://news.liga.net/ua/all/rss.xml", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
-    {"id": "nv", "name": "NV — «Новое время»", "feed": "https://nv.ua/ukr/rss/all.xml", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
+    {"id": "nv", "name": "NV — «Новое время»", "feed": "https://nv.ua/ukr/rss/all.xml", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3, "group": "nv"},
     {"id": "zn", "name": "Дзеркало тижня", "feed": "https://zn.ua/ukr/rss/full.rss", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
     {"id": "hromadske", "name": "hromadske", "enabled": false, "note": "20.11.2026: власної RSS-стрічки немає, з GitHub 404", "feed": "https://hromadske.ua/feed", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
     {"id": "babel", "name": "Бабель", "enabled": false, "note": "20.11.2026: адреса RSS дає 404 з GitHub, чинну не знайдено", "feed": "https://babel.ua/rss", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
@@ -14,12 +14,10 @@
     {"id": "ukrinform", "group": "ukrinform", "name": "Укрінформ", "feed": "https://www.ukrinform.ua/rss/block-lastnews", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "state", "trust": 2},
     {"id": "bbc-uk", "group": "bbc", "name": "BBC News Україна", "feed": "https://feeds.bbci.co.uk/ukrainian/rss.xml", "lang": "uk", "country": "GB", "cat": "ukraine", "type": "public", "trust": 3},
     {"id": "dw-uk", "name": "Deutsche Welle українською", "feed": "https://rss.dw.com/rdf/rss-ukr-all", "lang": "uk", "country": "DE", "cat": "world", "type": "public", "trust": 3},
-
     {"id": "bbc-world", "group": "bbc", "name": "BBC News", "feed": "https://feeds.bbci.co.uk/news/world/rss.xml", "lang": "en", "country": "GB", "cat": "world", "type": "public", "trust": 3},
     {"id": "nyt-world", "group": "nyt", "name": "The New York Times", "feed": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml", "lang": "en", "country": "US", "cat": "world", "type": "independent", "trust": 3},
     {"id": "times", "name": "The Times", "enabled": false, "note": "20.11.2026: за адресою не RSS-стрічка, чинну не знайдено", "feed": "https://www.thetimes.com/world/rss", "lang": "en", "country": "GB", "cat": "world", "type": "independent", "trust": 3},
-    {"id": "guardian", "name": "The Guardian", "feed": "https://www.theguardian.com/world/rss", "lang": "en", "country": "GB", "cat": "world", "type": "independent", "trust": 3},
-
+    {"id": "guardian", "name": "The Guardian", "feed": "https://www.theguardian.com/world/rss", "lang": "en", "country": "GB", "cat": "world", "type": "independent", "trust": 3, "group": "guardian"},
     {"id": "abc-au", "name": "ABC News Australia", "feed": "https://www.abc.net.au/news/feed/2942460/rss.xml", "lang": "en", "country": "AU", "cat": "world", "type": "public", "trust": 3},
     {"id": "france24", "name": "France 24", "feed": "https://www.france24.com/en/rss", "lang": "en", "country": "FR", "cat": "world", "type": "public", "trust": 3},
     {"id": "economist", "name": "The Economist", "feed": "https://www.economist.com/international/rss.xml", "lang": "en", "country": "GB", "cat": "world", "type": "independent", "trust": 3},
@@ -36,11 +34,9 @@
     {"id": "theins", "name": "The Insider", "feed": "https://theins.ru/feed", "lang": "ru", "country": "RU", "cat": "world", "type": "exile", "trust": 2},
     {"id": "zona", "name": "Медиазона", "feed": "https://zona.media/rss", "lang": "ru", "country": "RU", "cat": "world", "type": "exile", "trust": 2},
     {"id": "novaya-eu", "name": "Новая газета Европа", "feed": "https://novayagazeta.eu/feed/rss", "lang": "ru", "country": "RU", "cat": "world", "type": "exile", "trust": 2},
-
     {"id": "scmp-china", "group": "scmp", "name": "South China Morning Post", "feed": "https://www.scmp.com/rss/4/feed", "lang": "en", "country": "CN", "cat": "world", "type": "independent", "trust": 2},
     {"id": "caixin", "name": "Caixin Global", "enabled": false, "note": "21.11.2026: відмовляє GitHub (403), запасна офіційна стрічка не оновлюється з 2025", "feed": "https://www.caixinglobal.com/rss", "lang": "en", "country": "CN", "cat": "world", "type": "independent", "trust": 2},
     {"id": "xinhua", "enabled": false, "note": "21.11.2026: стрічка відповідає, але записи старі — не оновлюється", "name": "Сіньхуа (Xinhua)", "feed": "http://www.xinhuanet.com/english/rss/worldrss.xml", "lang": "en", "country": "CN", "cat": "world", "type": "state", "trust": 1},
-
     {"id": "bbc-tech", "group": "bbc", "name": "BBC News — Technology", "feed": "https://feeds.bbci.co.uk/news/technology/rss.xml", "lang": "en", "country": "GB", "cat": "tech", "type": "public", "trust": 3},
     {"id": "nyt-tech", "group": "nyt", "name": "The New York Times — Technology", "feed": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 3},
     {"id": "mit-tr", "name": "MIT Technology Review", "feed": "https://www.technologyreview.com/feed/", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 3},
@@ -49,14 +45,30 @@
     {"id": "tc-ai", "name": "TechCrunch — AI", "feed": "https://techcrunch.com/category/artificial-intelligence/feed/", "lang": "en", "country": "US", "cat": "tech", "type": "independent", "trust": 2},
     {"id": "scmp-tech", "group": "scmp", "name": "South China Morning Post — Tech", "feed": "https://www.scmp.com/rss/36/feed", "lang": "en", "country": "CN", "cat": "tech", "type": "independent", "trust": 2},
     {"id": "ain", "name": "AIN.UA", "feed": "https://ain.ua/feed/", "lang": "uk", "country": "UA", "cat": "tech", "type": "independent", "trust": 2},
-
     {"id": "hromadske-radio", "name": "Громадське радіо", "feed": "https://hromadske.radio/feed", "lang": "uk", "country": "UA", "cat": "ukraine", "type": "independent", "trust": 3},
-    {"id": "skynews-world", "name": "Sky News", "feed": "https://feeds.skynews.com/feeds/rss/world.xml", "lang": "en", "country": "GB", "cat": "world", "type": "independent", "trust": 2},
+    {"id": "skynews-world", "name": "Sky News", "feed": "https://feeds.skynews.com/feeds/rss/world.xml", "lang": "en", "country": "GB", "cat": "world", "type": "independent", "trust": 2, "group": "sky"},
     {"id": "hkfp", "name": "Hong Kong Free Press", "feed": "https://hongkongfp.com/feed/", "lang": "en", "country": "HK", "cat": "world", "type": "independent", "trust": 3},
     {"id": "cdt", "name": "China Digital Times", "feed": "https://chinadigitaltimes.net/feed/", "lang": "en", "country": "US", "cat": "world", "type": "independent", "trust": 2},
     {"id": "ukrinform-factcheck", "group": "ukrinform", "name": "Укрінформ — Фактчек (державне агентство)", "feed": "https://www.ukrinform.ua/rss/rubric-factcheck", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 2},
     {"id": "stopfake", "name": "StopFake", "feed": "https://www.stopfake.org/uk/feed/", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 3},
     {"id": "voxcheck", "enabled": false, "note": "23.11.2026: HTTP 403 для GitHub з 21.11 (крім одного запуску) — вимкнено; повернути разом із Суспільним, якщо запуск буде з ПК Романа", "name": "VoxCheck", "feed": "https://voxukraine.org/category/voxcheck/feed", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 3},
-    {"id": "behindthenews", "name": "По той бік новин", "enabled": false, "note": "20.11.2026: адреса RSS дає 404 з GitHub, чинну не знайдено", "feed": "https://behindthenews.ua/feed/", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 3}
+    {"id": "behindthenews", "name": "По той бік новин", "enabled": false, "note": "20.11.2026: адреса RSS дає 404 з GitHub, чинну не знайдено", "feed": "https://behindthenews.ua/feed/", "lang": "uk", "country": "UA", "cat": "fakes", "type": "factcheck", "trust": 3},
+    {"id": "nv-sport", "group": "nv", "name": "NV — «Новое время» — Спорт", "feed": "https://nv.ua/ukr/rss/2371.xml", "lang": "uk", "country": "UA", "cat": "ukraine", "sub": "sport", "type": "independent", "trust": 3, "note": "25.11.2026: перевірено з GitHub, працює"},
+    {"id": "xsport", "name": "XSPORT", "feed": "https://xsport.ua/rss/", "lang": "uk", "country": "UA", "cat": "ukraine", "sub": "sport", "type": "independent", "trust": 2, "note": "25.11.2026: перевірено з GitHub, працює"},
+    {"id": "sportarena", "name": "Sportarena", "feed": "https://sportarena.com/feed/", "lang": "ru", "country": "UA", "cat": "ukraine", "sub": "sport", "type": "independent", "trust": 2, "note": "25.11.2026: українське видання, стрічка російською — перекладається; працює"},
+    {"id": "isport", "name": "iSport.ua", "feed": "https://isport.ua/rss", "lang": "ru", "country": "UA", "cat": "ukraine", "sub": "sport", "type": "independent", "trust": 2, "note": "25.11.2026: українське видання, стрічка російською — перекладається; працює"},
+    {"id": "bbc-sport", "group": "bbc", "name": "BBC Sport", "feed": "https://feeds.bbci.co.uk/sport/rss.xml", "lang": "en", "country": "GB", "cat": "world", "sub": "sport", "type": "public", "trust": 3, "note": "25.11.2026: працює"},
+    {"id": "guardian-sport", "group": "guardian", "name": "The Guardian — Sport", "feed": "https://www.theguardian.com/uk/sport/rss", "lang": "en", "country": "GB", "cat": "world", "sub": "sport", "type": "independent", "trust": 3, "note": "25.11.2026: працює"},
+    {"id": "skysports", "group": "sky", "name": "Sky Sports", "feed": "https://www.skysports.com/rss/12040", "lang": "en", "country": "GB", "cat": "world", "sub": "sport", "type": "independent", "trust": 2, "note": "25.11.2026: працює"},
+    {"id": "espn", "name": "ESPN", "feed": "https://www.espn.com/espn/rss/news", "lang": "en", "country": "US", "cat": "world", "sub": "sport", "type": "independent", "trust": 2, "note": "25.11.2026: працює"},
+    {"id": "nv-auto", "group": "nv", "name": "NV — «Новое время» — Авто", "feed": "https://nv.ua/ukr/rss/154.xml", "lang": "uk", "country": "UA", "cat": "ukraine", "sub": "auto", "type": "independent", "trust": 3, "note": "25.11.2026: працює"},
+    {"id": "infocar", "name": "InfoCar.ua", "feed": "https://www.infocar.ua/rss/", "lang": "uk", "country": "UA", "cat": "ukraine", "sub": "auto", "type": "independent", "trust": 2, "note": "25.11.2026: працює; кодування windows-1251, мову стрічки перевірити в першому випуску"},
+    {"id": "autocar", "name": "Autocar", "feed": "https://www.autocar.co.uk/rss", "lang": "en", "country": "GB", "cat": "world", "sub": "auto", "type": "independent", "trust": 2, "note": "25.11.2026: працює"},
+    {"id": "electrek", "name": "Electrek", "feed": "https://electrek.co/feed/", "lang": "en", "country": "US", "cat": "world", "sub": "auto", "type": "independent", "trust": 2, "note": "25.11.2026: працює; електромобілі"},
+    {"id": "caranddriver", "name": "Car and Driver", "feed": "https://www.caranddriver.com/rss/all.xml/", "lang": "en", "country": "US", "cat": "world", "sub": "auto", "type": "independent", "trust": 2, "note": "25.11.2026: працює"},
+    {"id": "guardian-motoring", "group": "guardian", "name": "The Guardian — Motoring", "feed": "https://www.theguardian.com/technology/motoring/rss", "lang": "en", "country": "GB", "cat": "world", "sub": "auto", "type": "independent", "trust": 3, "note": "25.11.2026: працює"},
+    {"id": "upi-odd", "name": "United Press International — Odd News", "feed": "https://rss.upi.com/news/odd_news.rss", "lang": "en", "country": "US", "cat": "world", "sub": "fun", "type": "independent", "trust": 2, "note": "25.11.2026: справжні курйозні новини (не сатира); працює"},
+    {"id": "nv-lol", "group": "nv", "name": "NV — «Новое время» — LOL", "feed": "https://nv.ua/ukr/rss/2365.xml", "lang": "uk", "country": "UA", "cat": "ukraine", "sub": "fun", "type": "independent", "trust": 3, "note": "25.11.2026: рубрика розваг NV; перевірити в першому випуску, що це курйозні новини, а не меми"},
+    {"id": "zelenasadyba", "enabled": false, "name": "Зелена садиба", "feed": "https://zelenasadyba.com.ua/feed/", "lang": "uk", "country": "UA", "cat": "ukraine", "sub": "garden", "type": "independent", "trust": 2, "note": "25.11.2026: стрічка відповідає, але останній запис 9 днів тому — вимкнено до рішення Романа; інших садових стрічок, що відкриваються з GitHub, не знайдено"}
   ]
 }

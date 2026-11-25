@@ -85,14 +85,14 @@
       var quoted = a > 0 && b < text.length && OPEN_Q.indexOf(text.charAt(a - 1)) >= 0 && CLOSE_Q.indexOf(text.charAt(b)) >= 0;
       if (quoted) { a--; b++; }
       if (found.some(function (f) { return a < f.b && b > f.a; })) return;
-      found.push({ a: a, b: b, expl: g.e, quoted: quoted });
+      found.push({ a: a, b: b, expl: g.e, quoted: quoted, fromDict: g.s === 1 });
     });
     found.sort(function (x, y) { return x.a - y.a; });
     var out = [], pos = 0;
     found.forEach(function (f) {
       if (f.a > pos) out.push({ text: text.slice(pos, f.a) });
       var t = text.slice(f.a, f.b);
-      out.push({ term: f.quoted ? t : '«' + t + '»', expl: f.expl });
+      out.push({ term: f.quoted ? t : '«' + t + '»', expl: f.expl, fromDict: f.fromDict });
       pos = f.b;
     });
     if (pos < text.length) out.push({ text: text.slice(pos) });
@@ -120,6 +120,7 @@
       btn.setAttribute('aria-expanded', 'false');
       btn.setAttribute('aria-controls', box.id);
       btn.setAttribute('data-expl', sg.expl);
+      if (sg.fromDict) btn.setAttribute('data-dict', '1'); // зі словника Syto, а не від ШІ
       parent.appendChild(btn);
     });
     return box;
@@ -139,7 +140,7 @@
     if (!box) return;
     btn.setAttribute('aria-expanded', 'true');
     box.textContent = btn.getAttribute('data-expl');
-    box.appendChild(el('span', 'gloss-note', 'Пояснення ШІ — може бути неточним'));
+    if (!btn.getAttribute('data-dict')) box.appendChild(el('span', 'gloss-note', 'Пояснення ШІ — може бути неточним'));
     box.hidden = false;
   }
 
@@ -251,7 +252,7 @@
      ['b-state', '▲ Лише державне ЗМІ', 'Повідомляє тільки державне видання. Це офіційна позиція влади, а не незалежна перевірка.'],
      ['b-loud', 'Крикливий заголовок', 'Заголовок тисне на емоції. Такі новини Syto опускає нижче.'],
      ['b-factcheck', '✖ Спростування', 'Фактчекери перевірили поширене твердження і пояснили, що з ним не так.'],
-     ['term-sample', '«синє слово»', 'Сленг або вузький термін. Натисніть на нього — під текстом з’явиться коротке пояснення (його пише ШІ разом із перекладом, тому є лише в новинах іноземних редакцій).']
+     ['term-sample', '«синє слово»', 'Сленг, вузький термін або скорочення на кшталт «NYT». Натисніть на нього — під текстом з’явиться коротке пояснення. Відомі скорочення пояснює словник Syto (однаково в усіх новинах), решту — ШІ разом із перекладом, тому таких пояснень більше в новинах іноземних редакцій.']
     ].forEach(function (r) {
       var li = el('li');
       var sp = el('span'); sp.appendChild(el('span', r[0] === 'term-sample' ? r[0] : 'badge ' + r[0], r[1]));

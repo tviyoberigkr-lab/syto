@@ -3,6 +3,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { createHash } from 'node:crypto';
 import { SUB_CODES, TAB_SUBS, DEFAULT_SUB, isSub, subByRules } from './subs.mjs';
+import { withStaticGloss } from './gloss.mjs';
 
 export const WINDOW_HOURS = 48;        // новини старші за це не показуємо
 export const FAKES_WINDOW_HOURS = 168;  // спростування виходять рідше й лишаються актуальними довше — тиждень
@@ -313,6 +314,7 @@ export function clusterItems(items) {
  * Повертає {title?, summary?} або undefined, щоб у news.json поле було тільки там, де є терміни.
  */
 function glossFor(titleGloss, summaryGloss) {
+  // порожні масиви — це «пояснень немає»: поле gloss у news.json тоді не створюється
   const g = {};
   if (titleGloss?.length) g.title = titleGloss;
   if (summaryGloss?.length) g.summary = summaryGloss;
@@ -349,10 +351,14 @@ export function buildStory(members, srcMap, now = Date.now()) {
   const score = Math.round(
     (status === 'confirmed' ? 30 + 8 * (Math.min(independent.size, 5) - 2) : 0) +
     trustMax * 5 - ageH * 1.5 - (clickbait ? 15 : 0) - (stateOnly ? 10 : 0));
-  const gloss = glossFor(lead.titleUk && lead.titleGloss, lead.lang !== 'uk' && lead.summaryUk && lead.summaryGloss);
+  // Пояснення: від ШІ (лише для перекладених текстів) + сталий словник скорочень (працює і для українських новин).
+  const summaryText = lead.lang === 'uk' ? lead.summary : (lead.summaryUk || '');
+  const gloss = glossFor(
+    withStaticGloss(title, lead.titleUk ? lead.titleGloss : null),
+    withStaticGloss(summaryText, lead.lang !== 'uk' && lead.summaryUk ? lead.summaryGloss : null));
   return {
     id: lead.id, title,
-    summary: lead.lang === 'uk' ? lead.summary : (lead.summaryUk || ''),
+    summary: summaryText,
     ...(gloss ? { gloss } : {}),
     url: lead.url, ts: firstTs, lastTs,
     status, confirmations: independent.size, clickbait,
@@ -387,9 +393,10 @@ export function assemble(items, sources, now = Date.now()) {
   }
   const fakeStories = facts.sort((a, b) => b.ts - a.ts).slice(0, PER_TAB_LIMIT).map((f) => {
     const s = srcMap.get(f.src);
-    const gloss = glossFor(f.titleUk && f.titleGloss);
+    const fTitle = f.titleUk || f.title;
+    const gloss = glossFor(withStaticGloss(fTitle, f.titleUk ? f.titleGloss : null), withStaticGloss(f.summary, null));
     return {
-      id: f.id, title: f.titleUk || f.title, summary: f.summary, ...(gloss ? { gloss } : {}), url: f.url, ts: f.ts, lastTs: f.ts,
+      id: f.id, title: fTitle, summary: f.summary, ...(gloss ? { gloss } : {}), url: f.url, ts: f.ts, lastTs: f.ts,
       status: 'factcheck', confirmations: 0, clickbait: false, translated: !!f.titleUk, cats: ['fakes'], score: 0,
       sources: [{ id: s.id, name: s.name, type: s.type, lang: f.lang, url: f.url, title: f.title, ts: f.ts }],
     };

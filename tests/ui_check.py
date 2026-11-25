@@ -115,6 +115,18 @@ async def main():
                 check(await page.locator('.card .gloss:visible').count() == 1 and 'Атака на ланцюг' in gtxt2 and await terms.first.get_attribute('aria-expanded') == 'false', 'інший термін перемикає пояснення')
                 await terms.nth(1).click(); await page.wait_for_timeout(200)
                 check(await page.locator('.card .gloss:visible').count() == 0 and await terms.nth(1).get_attribute('aria-expanded') == 'false', 'повторний клік ховає пояснення')
+                # словник скорочень: українська новина (без перекладу) теж має синє слово, але без примітки «Пояснення ШІ»
+                await page.click('.tabs a[data-tab="ukraine"]')
+                await wait_title(page, 'Україна')
+                await page.click('#subs .sub[data-sub="all"]')
+                dict_term = page.locator('.card .term[data-dict="1"]')
+                check(await dict_term.count() >= 1, f'скорочення зі словника підсвічене ({await dict_term.count()})')
+                check(await dict_term.first.inner_text() == '«NYT»', f'термін у лапках ({await dict_term.first.inner_text()})')
+                await dict_term.first.click(); await page.wait_for_timeout(200)
+                gl = page.locator('.card .gloss:visible').first
+                check('The New York Times' in await gl.inner_text(), 'пояснення скорочення показується')
+                check(await page.locator('.card .gloss:visible .gloss-note').count() == 0, 'для словника немає примітки «Пояснення ШІ»')
+                await dict_term.first.click()
                 await page.click('.tabs a[data-tab="method"]')
                 await page.wait_for_selector('.srctable li')
                 check(await page.locator('.srctable li').count() == len(data['sources']), 'сторінка «Як це працює» показує всі джерела')

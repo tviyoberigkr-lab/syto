@@ -159,7 +159,7 @@ test('ЗБІРКА: терміни доходять до картки в news.js
   assert.match(s.gloss.title[0].e, /^Секрети-приманки — /);
   assert.deepEqual(s.gloss.summary.map((x) => x.w), ['атаку на ланцюг постачання']);
   assert.ok(s.title.includes(s.gloss.title[0].w) && s.summary.includes(s.gloss.summary[0].w));
-  assert.equal(saved.stories.filter((x) => x.gloss).length, 1, 'поле gloss лише там, де є терміни');
+  assert.equal(saved.stories.filter((x) => x.gloss).length, 2, 'поле gloss лише там, де є терміни (демо-новина з термінами ШІ + новина зі скороченням NYT)');
   const cache = JSON.parse(await readFile(join(first.dir, 'cache/tr.json'), 'utf8'));
   assert.equal(Object.values(cache).filter((x) => x.g).length, 2, 'g у кеші лише для двох текстів із термінами');
   const second = await run({ ANTHROPIC_API_KEY: 'test' }, {}, first.dir);
@@ -220,11 +220,11 @@ for (const [name, env] of [['Gemini', { GEMINI_API_KEY: 'test' }], ['Anthropic',
     const ai = byTitle(d, 'модель ШІ');
     assert.equal(ai.confirmations, 2, 'англомовна й українська техноновина зійшлися');
     assert.equal(byTitle(d, 'рекордні').status, 'state');
-    assert.equal(d.stats.translation.translated, 13, '9 старих текстів + опис мосту (рос.) + заголовок і опис демо-новини з термінами + заголовок спортивної стрічки (її опис не перекладається)');
+    assert.equal(d.stats.translation.translated, 14, '9 старих текстів + опис мосту (рос.) + заголовок і опис демо-новини з термінами + заголовок і опис спортивної стрічки');
     // другий запуск: усе з кешу, платних викликів немає
     const second = await run(env, {}, first.dir);
     assert.equal(second.fetchImpl.calls.translate, 0);
-    assert.equal(second.data.stats.translation.fromCache, 13);
+    assert.equal(second.data.stats.translation.fromCache, 14);
     assert.equal(byTitle(second.data, 'міст через річку').confirmations, 4);
   });
 }
@@ -240,7 +240,7 @@ test('ЗБІРКА: пауза перекладу (TRANSLATE_MAX_NEW=0) не р�
 test('ЗБІРКА: збій перекладача не валить збірку', async () => {
   const { data, written } = await run({ ANTHROPIC_API_KEY: 'test' }, { translatorFails: true });
   assert.ok(written);
-  assert.equal(data.stats.translation.failed, 13);
+  assert.equal(data.stats.translation.failed, 14);
   assert.ok(byTitle(data, 'undersea cable'));
 });
 
@@ -489,6 +489,7 @@ test('fixMixed: латинські двійники виправляє, зіпс
 // ---------- рубрики (підкатегорії), 25.11.2026 ----------
 import { subOf, assemble, PER_SUB_LIMIT } from '../pipeline/lib.mjs';
 import { subByRules, SUBS, TAB_SUBS } from '../pipeline/subs.mjs';
+import { withStaticGloss } from '../pipeline/gloss.mjs';
 import { parseClasses, classifyItems } from '../pipeline/translate.mjs';
 
 test('РУБРИКИ: правила за словами розпізнають війну, політику, економіку, спорт, авто, сад', () => {
@@ -593,23 +594,13 @@ test('ЗБІРКА: рубрики доходять до news.json, кеш ру�
 // ---------- економія на описах тематичних стрічок і вікно садових стрічок (25.11.2026) ----------
 import { windowFor, GARDEN_WINDOW_HOURS } from '../pipeline/lib.mjs';
 
-test('ЕКОНОМІЯ: у тематичній іноземній стрічці перекладається лише заголовок, опис із кешу — застосовується', async () => {
+test('ОПИСИ: у тематичній іноземній стрічці перекладається і заголовок, і опис (рішення Романа 25.11)', async () => {
   const sent = [];
-  const provider = { name: 'fake', apiKey: 'k', model: 'm', call: async (batch) => { sent.push(...batch); return JSON.stringify(batch.map(() => 'Переклад заголовка про фінал кубка міста')); } };
-  const it = { id: 'a', src: 's', lang: 'en', titleOnly: true, title: 'Headline about the city cup final', summary: 'Summary about the very same city cup final match' };
-  const st = await translateItems([it], {}, { provider, now: NOW });
-  assert.deepEqual(sent, ['Headline about the city cup final'], 'у платний запит пішов лише заголовок');
-  assert.ok(it.titleUk && !it.summaryUk, 'опис лишився в оригіналі');
-  assert.equal(st.skipped, 0, 'пропущений опис не висить у черзі');
-  // опис, який уже лежить у кеші (переклали до ввімкнення економії), застосовується безкоштовно
-  const { createHash } = await import('node:crypto');
-  const k = (t) => createHash('sha1').update(t).digest('hex').slice(0, 16);
-  const it2 = { id: 'b', src: 's', lang: 'en', titleOnly: true, title: 'Headline about the city cup final', summary: 'Summary about the very same city cup final match' };
-  const cache = { [k(it2.title)]: { t: 'Переклад заголовка про фінал кубка міста', o: it2.title, ts: NOW }, [k(it2.summary)]: { t: 'Опис того самого матчу за кубок міста, переклад', o: it2.summary, ts: NOW } };
-  sent.length = 0;
-  await translateItems([it2], cache, { provider, now: NOW });
-  assert.equal(sent.length, 0, 'платних викликів немає');
-  assert.ok(it2.summaryUk, 'кешований опис застосовано');
+  const provider = { name: 'fake', apiKey: 'k', model: 'm', call: async (batch) => { sent.push(...batch); return JSON.stringify(batch.map((t) => (/Headline/.test(t) ? 'Переклад заголовка про фінал кубка міста' : 'Переклад опису того самого матчу за кубок міста'))); } };
+  const it = { id: 'a', src: 's', lang: 'en', title: 'Headline about the city cup final', summary: 'Summary about the very same city cup final match' };
+  await translateItems([it], {}, { provider, now: NOW });
+  assert.equal(sent.length, 2, 'у платний запит пішли і заголовок, і опис');
+  assert.ok(it.titleUk && it.summaryUk, 'у картці буде і заголовок, і опис');
 });
 
 test('САД: вікно садових стрічок — 30 днів, десятиденна порада лишається у стрічці', () => {
@@ -626,18 +617,33 @@ test('САД: вікно садових стрічок — 30 днів, деся
   assert.match(items[0].title, /часник/);
 });
 
-test('ЗБІРКА: тематична стрічка дає рубрику й не платить за свої описи', async () => {
+test('ЗБІРКА: тематична стрічка дає рубрику, опис перекладається, скорочення пояснюються словником', async () => {
   const r = await run({ ANTHROPIC_API_KEY: 'test' });
   const sport = byTitle(r.data, 'фінал кубка');
   assert.equal(sport.sub, 'sport', 'рубрика з тематичної стрічки');
   assert.ok(r.data.tabs.world.includes(sport.id));
-  assert.equal(sport.summary, '', 'опис іноземної тематичної стрічки не перекладався');
+  assert.match(sport.summary, /додатковий час/, 'опис тематичної стрічки перекладено (економію скасовано 25.11)');
   assert.ok(sport.translated);
   const garden = byTitle(r.data, 'часник');
   assert.equal(garden.sub, 'garden');
   assert.ok(r.data.tabs.ukraine.includes(garden.id), 'десятиденна садова порада у стрічці «Україна»');
-  const cache = JSON.parse(await readFile(join(r.dir, 'cache/tr.json'), 'utf8'));
-  const originals = Object.values(cache).map((c) => c.o ?? '');
-  assert.ok(!originals.some((o) => o.includes('extra time after a late equaliser')), 'опису спортивної стрічки немає в кеші перекладів');
-  assert.ok(originals.some((o) => o.includes('city club wins the cup final')), 'а заголовок — є');
+  // сталий словник: українська новина без перекладу теж отримує пояснення скорочень
+  const hack = byTitle(r.data, 'хакери');
+  assert.ok(!hack.translated, 'новина української редакції через перекладач не проходить');
+  assert.deepEqual(hack.gloss.title.map((x) => x.w), ['NYT']);
+  assert.deepEqual(hack.gloss.summary.map((x) => x.w), ['AFP']);
+  assert.ok(hack.gloss.title.every((x) => x.s === 1), 'позначено як пояснення зі словника, не від ШІ');
+  assert.ok(hack.title.includes('NYT') && hack.summary.includes('AFP'), 'терміни стоять у тексті дослівно');
+});
+
+test('СЛОВНИК: не чіпає пояснення ШІ, шукає з межами слова, не більше двох на текст', () => {
+  const ai = [{ w: 'секрети-приманки', e: 'Секрети-приманки — мічені дані.' }];
+  assert.deepEqual(withStaticGloss('Текст про секрети-приманки', ai), ai, 'без скорочень нічого не додається');
+  assert.equal(withStaticGloss('ГРАФІК APPLE та CAPTCHA без скорочень', []).length, 0, '«AP» усередині слова не спрацьовує');
+  const many = withStaticGloss('NYT, WSJ і FT повідомили', []);
+  assert.equal(many.length, 2, 'не більше двох сталих пояснень на текст');
+  assert.deepEqual(many.map((x) => x.w), ['NYT', 'WSJ']);
+  const mixed = withStaticGloss('NYT пише про «секрети-приманки»', ai);
+  assert.deepEqual(mixed.map((x) => x.w), ['секрети-приманки', 'NYT'], 'пояснення ШІ лишається першим');
+  assert.ok(withStaticGloss('NYT', []).every((x) => x.e.startsWith('NYT — ')));
 });

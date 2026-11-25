@@ -7,12 +7,14 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseFeed, cleanText } from '../pipeline/lib.mjs';
+import { parseFeed, cleanText, windowFor } from '../pipeline/lib.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const UA = 'Mozilla/5.0 (compatible; SytoNewsBot/1.0; +https://tviyoberigkr-lab.github.io/syto/)';
 
-async function check(url) {
+const FRESH_HOURS = 72; // для адрес, яких ще немає в sources.json
+
+async function check(url, limitH = FRESH_HOURS) {
   const t0 = Date.now();
   try {
     const res = await fetch(url, { headers: { 'user-agent': UA, accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*' }, redirect: 'follow', signal: AbortSignal.timeout(20000) });
@@ -29,17 +31,18 @@ async function check(url) {
     const dates = raw.map((r) => Date.parse(r.date)).filter(Number.isFinite);
     const newest = dates.length ? new Date(Math.max(...dates)) : null;
     const ageH = newest ? Math.round((Date.now() - newest) / 3600e3) : null;
-    const fresh = ageH !== null && ageH <= 72;
-    return { url, ok: fresh, why: fresh ? '' : newest ? `найсвіжіший запис ${ageH} год тому` : 'у записах немає дат', items: raw.length, newest: newest?.toISOString().slice(0, 16), ms, sample: raw.slice(0, 3).map((r) => cleanText(r.title, 80)).join(' ⟋ ') };
+    const fresh = ageH !== null && ageH <= limitH;
+    return { url, ok: fresh, why: fresh ? '' : newest ? `найсвіжіший запис ${ageH} год тому (вікно цієї стрічки — ${limitH} год)` : 'у записах немає дат', items: raw.length, newest: newest?.toISOString().slice(0, 16), ms, sample: raw.slice(0, 3).map((r) => cleanText(r.title, 80)).join(' ⟋ ') };
   } catch (e) {
     return { url, ok: false, why: String(e?.cause?.code ?? e.message).slice(0, 80), ms: Date.now() - t0 };
   }
 }
 
+// Вікно свіжості беремо те саме, що й збірка: у фактчекерів тиждень, у садових стрічок 30 днів (windowFor).
+const known = new Map(JSON.parse(await readFile(resolve(ROOT, 'sources.json'), 'utf8')).sources.map((s) => [s.feed, windowFor(s)]));
 const urls = process.argv.slice(2);
 if (!urls.length) {
-  const src = JSON.parse(await readFile(resolve(ROOT, 'sources.json'), 'utf8')).sources;
-  for (const s of src) urls.push(s.feed);
+  for (const feed of known.keys()) urls.push(feed);
   try {
     for (const line of (await readFile(resolve(ROOT, 'tools/feed_candidates.txt'), 'utf8')).split('\n')) {
       const u = line.trim();
@@ -47,7 +50,7 @@ if (!urls.length) {
     }
   } catch { /* файла кандидатів може не бути */ }
 }
-const results = await Promise.all(urls.map(check));
+const results = await Promise.all(urls.map((u) => check(u, known.get(u) ?? FRESH_HOURS)));
 let okN = 0;
 for (const r of results) {
   if (r.ok) okN++;

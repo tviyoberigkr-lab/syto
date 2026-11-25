@@ -14,6 +14,9 @@ export const demoSources = [
   { id: 'd-wire', name: 'Demo State Wire', feed: 'https://demo.invalid/wire.rss', lang: 'en', country: 'CN', cat: 'world', type: 'state', trust: 1 },
   { id: 'd-tech', name: 'Demo Tech Review', feed: 'https://demo.invalid/tech.rss', lang: 'en', country: 'US', cat: 'tech', type: 'independent', trust: 3 },
   { id: 'd-tech2', name: 'Демо-техно', feed: 'https://demo.invalid/tech2.rss', lang: 'uk', country: 'UA', cat: 'tech', type: 'independent', trust: 2 },
+  // тематична стрічка: рубрика береться з джерела, а іноземні описи в таких стрічках не перекладаються (titleOnly)
+  { id: 'd-sport', name: 'Demo Sports Wire', feed: 'https://demo.invalid/sport.rss', lang: 'en', country: 'GB', cat: 'world', sub: 'sport', type: 'independent', trust: 2 },
+  { id: 'd-garden', name: 'Демо-садиба', feed: 'https://demo.invalid/garden.rss', lang: 'uk', country: 'UA', cat: 'ukraine', sub: 'garden', type: 'independent', trust: 2 },
   { id: 'd-fc', name: 'Демо-фактчек', feed: 'https://demo.invalid/fc.rss', lang: 'uk', country: 'UA', cat: 'fakes', type: 'factcheck', trust: 3 },
   { id: 'd-broken', name: 'Демо: зламана стрічка', feed: 'https://demo.invalid/broken.rss', lang: 'uk', country: 'UA', cat: 'ukraine', type: 'independent', trust: 2 },
   { id: 'd-down', name: 'Демо: сайт лежить', feed: 'https://demo.invalid/down.rss', lang: 'uk', country: 'UA', cat: 'ukraine', type: 'independent', trust: 2 },
@@ -37,6 +40,7 @@ export const demoTranslations = {
   'Demo wire: officials praise record harvest figures': 'Демо: чиновники хвалять рекордні показники врожаю',
   'Demo lab unveils open AI model for weather forecasting': 'Демо: лабораторія представила відкриту модель ШІ для прогнозу погоди',
   'Demo: quantum chip sets new stability record': 'Демо: квантовий чип встановив новий рекорд стабільності',
+  'Demo Sports: city club wins the cup final after extra time': 'Демо-спорт: міський клуб виграв фінал кубка в додатковий час',
   // Новий формат відповіді: переклад + терміни з поясненнями. Перший — термін уже в лапках (лапки не подвоюються),
   // другий — без лапок (інтерфейс додасть їх сам).
   'Demo: researcher plants 2 million canary tokens in AI supply chain': {
@@ -111,6 +115,13 @@ export function demoFeeds(now = Date.now()) {
   ], now));
   put('https://demo.invalid/tech2.rss', rss([
     { t: 'Демо: лабораторія представила відкриту модель ШІ для прогнозу погоди', l: u('t2a'), h: 1.8, d: 'Модель доступна дослідникам безкоштовно. Це вигадана новина для показу.' },
+  ], now));
+  put('https://demo.invalid/sport.rss', rss([
+    { t: 'Demo Sports: city club wins the cup final after extra time', l: u('sp1'), h: 2, d: 'Demo summary: the match went to extra time after a late equaliser.' },
+  ], now));
+  // садова стрічка пише рідко: запис десятиденної давнини має лишатися у стрічці (вікно 30 днів)
+  put('https://demo.invalid/garden.rss', rss([
+    { t: 'Демо: коли садити часник під зиму — поради городникам', l: u('g1'), h: 240, d: 'Оптимальний строк — за три тижні до морозів. Це вигадана новина для показу.' },
   ], now));
   put('https://demo.invalid/fc.rss', rss([
     { t: 'Демо-фейк: у місті Н нібито закрили всі школи. Це неправда', l: u('fc1'), h: 3, d: 'Фактчекери перевірили повідомлення з соцмереж: школи працюють. Це вигаданий приклад спростування.' },

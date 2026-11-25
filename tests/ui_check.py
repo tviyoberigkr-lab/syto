@@ -58,8 +58,10 @@ async def main():
                 check(all('Економіка' in t for t in await page.locator('.card .meta').all_inner_texts()), 'у картці видно назву рубрики')
                 await page.reload(); await page.wait_for_selector('.card')
                 check(await page.locator('#subs .sub[aria-pressed="true"]').get_attribute('data-sub') == 'economy', 'вибір рубрики запам’ятався після перезавантаження')
+                await page.click('#subs .sub[data-sub="auto"]')  # у демо-даних авто-новин немає
+                check(await page.locator('.card').count() == 0 and 'Авто' in await page.locator('#empty').inner_text(), 'порожня рубрика пояснює, що робити')
                 await page.click('#subs .sub[data-sub="garden"]')
-                check(await page.locator('.card').count() == 0 and 'Сад і город' in await page.locator('#empty').inner_text(), 'порожня рубрика пояснює, що робити')
+                check(await page.locator('.card').count() == 1 and 'часник' in await page.locator('.card').first.inner_text(), 'садова порада десятиденної давнини показується (вікно 30 днів)')
                 await page.click('#subs .sub[data-sub="all"]')
                 check(await page.locator('.card').count() == n_all, '«Усе» повертає весь розділ')
                 await page.click('[data-filter="confirmed"]')

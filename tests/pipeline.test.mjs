@@ -220,11 +220,11 @@ for (const [name, env] of [['Gemini', { GEMINI_API_KEY: 'test' }], ['Anthropic',
     const ai = byTitle(d, 'модель ШІ');
     assert.equal(ai.confirmations, 2, 'англомовна й українська техноновина зійшлися');
     assert.equal(byTitle(d, 'рекордні').status, 'state');
-    assert.equal(d.stats.translation.translated, 12, '9 старих текстів + опис мосту (рос.) + заголовок і опис демо-новини з термінами');
+    assert.equal(d.stats.translation.translated, 13, '9 старих текстів + опис мосту (рос.) + заголовок і опис демо-новини з термінами + заголовок спортивної стрічки (її опис не перекладається)');
     // другий запуск: усе з кешу, платних викликів немає
     const second = await run(env, {}, first.dir);
     assert.equal(second.fetchImpl.calls.translate, 0);
-    assert.equal(second.data.stats.translation.fromCache, 12);
+    assert.equal(second.data.stats.translation.fromCache, 13);
     assert.equal(byTitle(second.data, 'міст через річку').confirmations, 4);
   });
 }
@@ -240,7 +240,7 @@ test('ЗБІРКА: пауза перекладу (TRANSLATE_MAX_NEW=0) не р�
 test('ЗБІРКА: збій перекладача не валить збірку', async () => {
   const { data, written } = await run({ ANTHROPIC_API_KEY: 'test' }, { translatorFails: true });
   assert.ok(written);
-  assert.equal(data.stats.translation.failed, 12);
+  assert.equal(data.stats.translation.failed, 13);
   assert.ok(byTitle(data, 'undersea cable'));
 });
 
@@ -588,4 +588,56 @@ test('ЗБІРКА: рубрики доходять до news.json, кеш ру�
   const r2 = await run({ ANTHROPIC_API_KEY: 'test' }, {}, r.dir);
   assert.equal(r2.fetchImpl.calls.classify, 0);
   assert.equal(r2.data.stats.classification.fromCache, r.data.stats.classification.classified + r.data.stats.classification.fromCache);
+});
+
+// ---------- економія на описах тематичних стрічок і вікно садових стрічок (25.11.2026) ----------
+import { windowFor, GARDEN_WINDOW_HOURS } from '../pipeline/lib.mjs';
+
+test('ЕКОНОМІЯ: у тематичній іноземній стрічці перекладається лише заголовок, опис із кешу — застосовується', async () => {
+  const sent = [];
+  const provider = { name: 'fake', apiKey: 'k', model: 'm', call: async (batch) => { sent.push(...batch); return JSON.stringify(batch.map(() => 'Переклад заголовка про фінал кубка міста')); } };
+  const it = { id: 'a', src: 's', lang: 'en', titleOnly: true, title: 'Headline about the city cup final', summary: 'Summary about the very same city cup final match' };
+  const st = await translateItems([it], {}, { provider, now: NOW });
+  assert.deepEqual(sent, ['Headline about the city cup final'], 'у платний запит пішов лише заголовок');
+  assert.ok(it.titleUk && !it.summaryUk, 'опис лишився в оригіналі');
+  assert.equal(st.skipped, 0, 'пропущений опис не висить у черзі');
+  // опис, який уже лежить у кеші (переклали до ввімкнення економії), застосовується безкоштовно
+  const { createHash } = await import('node:crypto');
+  const k = (t) => createHash('sha1').update(t).digest('hex').slice(0, 16);
+  const it2 = { id: 'b', src: 's', lang: 'en', titleOnly: true, title: 'Headline about the city cup final', summary: 'Summary about the very same city cup final match' };
+  const cache = { [k(it2.title)]: { t: 'Переклад заголовка про фінал кубка міста', o: it2.title, ts: NOW }, [k(it2.summary)]: { t: 'Опис того самого матчу за кубок міста, переклад', o: it2.summary, ts: NOW } };
+  sent.length = 0;
+  await translateItems([it2], cache, { provider, now: NOW });
+  assert.equal(sent.length, 0, 'платних викликів немає');
+  assert.ok(it2.summaryUk, 'кешований опис застосовано');
+});
+
+test('САД: вікно садових стрічок — 30 днів, десятиденна порада лишається у стрічці', () => {
+  assert.equal(windowFor({ sub: 'garden' }), GARDEN_WINDOW_HOURS);
+  assert.equal(windowFor({ cat: 'fakes' }), 168);
+  assert.equal(windowFor({ cat: 'ukraine' }), 48);
+  const src = { id: 'g', lang: 'uk', sub: 'garden' };
+  const raw = [
+    { title: 'Коли садити часник під зиму — поради городникам', link: 'https://g.example/1', date: new Date(NOW - 240 * 3600e3).toUTCString() },
+    { title: 'Зовсім стара порада, якої вже не має бути', link: 'https://g.example/2', date: new Date(NOW - 800 * 3600e3).toUTCString() },
+  ];
+  const { items } = normalizeItems(raw, src, NOW);
+  assert.equal(items.length, 1);
+  assert.match(items[0].title, /часник/);
+});
+
+test('ЗБІРКА: тематична стрічка дає рубрику й не платить за свої описи', async () => {
+  const r = await run({ ANTHROPIC_API_KEY: 'test' });
+  const sport = byTitle(r.data, 'фінал кубка');
+  assert.equal(sport.sub, 'sport', 'рубрика з тематичної стрічки');
+  assert.ok(r.data.tabs.world.includes(sport.id));
+  assert.equal(sport.summary, '', 'опис іноземної тематичної стрічки не перекладався');
+  assert.ok(sport.translated);
+  const garden = byTitle(r.data, 'часник');
+  assert.equal(garden.sub, 'garden');
+  assert.ok(r.data.tabs.ukraine.includes(garden.id), 'десятиденна садова порада у стрічці «Україна»');
+  const cache = JSON.parse(await readFile(join(r.dir, 'cache/tr.json'), 'utf8'));
+  const originals = Object.values(cache).map((c) => c.o ?? '');
+  assert.ok(!originals.some((o) => o.includes('extra time after a late equaliser')), 'опису спортивної стрічки немає в кеші перекладів');
+  assert.ok(originals.some((o) => o.includes('city club wins the cup final')), 'а заголовок — є');
 });

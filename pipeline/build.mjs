@@ -72,6 +72,12 @@ export async function build({
   const items = [...byId.values()];
   const storeSnapshot = JSON.stringify(items.map(({ id, title, url, ts, summary, src, lang }) => ({ id, title, url, ts, summary, src, lang })));
 
+  // Економія (25.11, рішення Романа, варіант 1): у тематичних стрічках (спорт, авто, курйози) іноземні ОПИСИ
+  // не перекладаємо — вони майже дублюють заголовок, а платимо за них як за новий текст. Заголовок перекладається
+  // завжди; опис, який уже є в кеші, застосовується безкоштовно, доки не вийде строк кешу.
+  const srcById = new Map(sources.map((s) => [s.id, s]));
+  for (const it of items) if (it.lang !== 'uk' && srcById.get(it.src)?.sub) it.titleOnly = true;
+
   let cache = {};
   try { cache = JSON.parse(await readFile(cachePath, 'utf8')); } catch { /* першого разу кешу ще немає */ }
   const tr = await translateItems(items, cache, { provider: pickProvider(env), maxNew: env.TRANSLATE_MAX_NEW === undefined || env.TRANSLATE_MAX_NEW === '' ? 400 : Number(env.TRANSLATE_MAX_NEW), fetchImpl, now });

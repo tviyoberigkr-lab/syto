@@ -266,6 +266,8 @@ export async function translateItems(items, cache, { provider, maxNew = 400, fet
         if (now - c.ts > 86400e3) c.ts = now;
         if (count) stats.fromCache++;
       } else if (count && !seen.has(k)) {
+        // it.titleOnly — тематична іноземна стрічка: заголовок перекладаємо, за опис не платимо (кешований вище вже застосовано)
+        if (src === 'summary' && it.titleOnly) continue;
         seen.add(k);
         if (c && c.fail >= MAX_FAILS) { if (now - c.ts > 86400e3) c.ts = now; continue; } // безнадійний текст — не платимо за нього знову
         todo.push({ text, src: it.src ?? '' });

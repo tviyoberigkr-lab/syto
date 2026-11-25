@@ -18,7 +18,12 @@ async function check(url) {
     const res = await fetch(url, { headers: { 'user-agent': UA, accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*' }, redirect: 'follow', signal: AbortSignal.timeout(20000) });
     const ms = Date.now() - t0;
     if (!res.ok) return { url, ok: false, why: `HTTP ${res.status}`, ms };
-    const xml = await res.text();
+    // кодування — як у pipeline/build.mjs: із заголовка відповіді або з XML-декларації (InfoCar віддає windows-1251)
+    const buf = Buffer.from(await res.arrayBuffer());
+    const head = buf.subarray(0, 200).toString('latin1');
+    const enc = (res.headers.get('content-type')?.match(/charset=([\w-]+)/i)?.[1] || head.match(/encoding=["']([\w-]+)["']/i)?.[1] || 'utf-8').toLowerCase();
+    let xml;
+    try { xml = new TextDecoder(enc).decode(buf); } catch { xml = new TextDecoder('utf-8').decode(buf); }
     let raw;
     try { raw = parseFeed(xml); } catch (e) { return { url, ok: false, why: `не стрічка: ${e.message} (${res.headers.get('content-type') ?? '?'})`, ms }; }
     const dates = raw.map((r) => Date.parse(r.date)).filter(Number.isFinite);

@@ -6,8 +6,8 @@ import { SUB_CODES, TAB_SUBS, DEFAULT_SUB, isSub, subByRules } from './subs.mjs'
 
 export const WINDOW_HOURS = 48;        // новини старші за це не показуємо
 export const FAKES_WINDOW_HOURS = 168;  // спростування виходять рідше й лишаються актуальними довше — тиждень
-// Садові поради теж не старіють за два дні, а садові видання пишуть кілька разів на тиждень — тиждень.
-export const windowFor = (source) => (source?.cat === 'fakes' || source?.sub === 'garden' ? FAKES_WINDOW_HOURS : WINDOW_HOURS);
+export const GARDEN_WINDOW_HOURS = 720; // «Сад і город»: поради сезонні («коли садити часник»), видання пишуть раз на тиждень — місяць
+export const windowFor = (source) => (source?.sub === 'garden' ? GARDEN_WINDOW_HOURS : source?.cat === 'fakes' ? FAKES_WINDOW_HOURS : WINDOW_HOURS);
 export const CLUSTER_GAP_HOURS = 36;   // максимум між двома повідомленнями про одну подію
 export const SIM_THRESHOLD = 0.5;      // поріг схожості заголовків
 export const PER_FEED_LIMIT = 30;      // беремо не більше N найсвіжіших з кожної стрічки

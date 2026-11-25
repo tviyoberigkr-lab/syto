@@ -77,11 +77,26 @@ jobs:
       - name: Зберегти кеші (переклади, рубрики, кандидати у словник)
         if: steps.fresh.outputs.skip != 'true'
         run: |
+          # 25.11: два запуски, що перетнулися (cron-job.org + ручний), валили ВЕСЬ випуск — другий пушив кеш
+          # поверх уже оновленої гілки, крок падав, публікація пропускалась. Тепер перед кожною спробою
+          # беремо свіжу гілку й кладемо на неї свої кеші; site/data/news.json не відстежується git, тож
+          # reset його не чіпає і зібраний випуск доходить до публікації.
           date -u +%F > data/heartbeat.txt
           git config user.name "syto-bot"
           git config user.email "syto-bot@users.noreply.github.com"
-          git add data/translations.json data/classes.json data/abbr_candidates.json data/heartbeat.txt
-          git diff --cached --quiet || (git commit -m "дані: кеші перекладів, рубрик і кандидатів у словник [skip ci]" && git push)
+          mkdir -p "$RUNNER_TEMP/syto-data"
+          cp data/translations.json data/classes.json data/abbr_candidates.json data/heartbeat.txt "$RUNNER_TEMP/syto-data/"
+          for attempt in 1 2 3; do
+            git fetch --depth=1 origin main
+            git reset --hard FETCH_HEAD
+            cp "$RUNNER_TEMP/syto-data/"* data/
+            git add data/translations.json data/classes.json data/abbr_candidates.json data/heartbeat.txt
+            if git diff --cached --quiet; then echo "кеші не змінилися"; break; fi
+            git commit -m "дані: кеші перекладів, рубрик і кандидатів у словник [skip ci]"
+            if git push; then echo "кеші збережено (спроба $attempt)"; break; fi
+            echo "гілку оновив хтось інший — пробую ще раз (спроба $attempt)"
+            sleep 5
+          done
       - uses: actions/configure-pages@v5
         if: steps.fresh.outputs.skip != 'true'
       - uses: actions/upload-pages-artifact@v4

@@ -17,7 +17,7 @@ async function run(env = {}, fetchOpts = {}, dir) {
   await writeFile(sourcesPath, JSON.stringify({ sources: demoSources }));
   const fetchImpl = demoFetch(NOW, fetchOpts);
   const logs = [];
-  const r = await build({ sourcesPath, outPath: join(dir, 'out/news.json'), cachePath: join(dir, 'cache/tr.json'), classesPath: join(dir, 'cache/classes.json'), storePath: join(dir, 'cache/items.json'), retryPauseMs: 0, env, fetchImpl, now: NOW, log: (l) => logs.push(l) });
+  const r = await build({ sourcesPath, outPath: join(dir, 'out/news.json'), cachePath: join(dir, 'cache/tr.json'), classesPath: join(dir, 'cache/classes.json'), abbrPath: join(dir, 'cache/abbr.json'), storePath: join(dir, 'cache/items.json'), retryPauseMs: 0, env, fetchImpl, now: NOW, log: (l) => logs.push(l) });
   return { ...r, dir, fetchImpl, logs };
 }
 const byTitle = (data, part) => data.stories.find((s) => s.title.includes(part));
@@ -250,7 +250,7 @@ test('ЗБІРКА: якщо впали майже всі стрічки — с�
   await writeFile(sourcesPath, JSON.stringify({ sources: demoSources }));
   const outPath = join(dir, 'news.json');
   await writeFile(outPath, '{"keep":true}');
-  const r = await build({ sourcesPath, outPath, cachePath: join(dir, 'c.json'), classesPath: join(dir, 'cl.json'), storePath: join(dir, 'i.json'), retryPauseMs: 0, env: {}, fetchImpl: async () => { throw new Error('мережі немає'); }, now: NOW, log: () => {} });
+  const r = await build({ sourcesPath, outPath, cachePath: join(dir, 'c.json'), classesPath: join(dir, 'cl.json'), abbrPath: join(dir, 'ab.json'), storePath: join(dir, 'i.json'), retryPauseMs: 0, env: {}, fetchImpl: async () => { throw new Error('мережі немає'); }, now: NOW, log: () => {} });
   assert.equal(r.written, false);
   assert.equal(await readFile(outPath, 'utf8'), '{"keep":true}');
 });
@@ -489,7 +489,7 @@ test('fixMixed: латинські двійники виправляє, зіпс
 // ---------- рубрики (підкатегорії), 25.11.2026 ----------
 import { subOf, assemble, PER_SUB_LIMIT } from '../pipeline/lib.mjs';
 import { subByRules, SUBS, TAB_SUBS } from '../pipeline/subs.mjs';
-import { withStaticGloss } from '../pipeline/gloss.mjs';
+import { withStaticGloss, abbrOf, mergeAbbrCandidates, CANDIDATE_KEEP_DAYS } from '../pipeline/gloss.mjs';
 import { parseClasses, classifyItems } from '../pipeline/translate.mjs';
 
 test('РУБРИКИ: правила за словами розпізнають війну, політику, економіку, спорт, авто, сад', () => {
@@ -644,6 +644,45 @@ test('СЛОВНИК: не чіпає пояснення ШІ, шукає з м�
   assert.equal(many.length, 2, 'не більше двох сталих пояснень на текст');
   assert.deepEqual(many.map((x) => x.w), ['NYT', 'WSJ']);
   const mixed = withStaticGloss('NYT пише про «секрети-приманки»', ai);
-  assert.deepEqual(mixed.map((x) => x.w), ['секрети-приманки', 'NYT'], 'пояснення ШІ лишається першим');
+  assert.deepEqual(mixed.map((x) => x.w), ['NYT', 'секрети-приманки'], 'словник іде першим, пояснення ШІ — за ним');
+  const clash = withStaticGloss('NYT пише', [{ w: 'NYT', e: 'Вигадане поясненння від моделі' }]);
+  assert.deepEqual(clash, [{ w: 'NYT', e: clash[0].e, s: 1 }], 'на однакове слово перемагає словник, а не ШІ');
+  assert.match(clash[0].e, /The New York Times/);
   assert.ok(withStaticGloss('NYT', []).every((x) => x.e.startsWith('NYT — ')));
+});
+
+// ---------- кандидати у словник скорочень (25.11.2026) ----------
+test('КАНДИДАТИ: збираються лише невідомі скорочення, загальновідомі й ті, що вже у словнику, пропускаються', () => {
+  assert.deepEqual(abbrOf('Удар по ОВА: ЗСУ збили БПЛА, пише NYT').sort(), ['ОВА']);
+  assert.deepEqual(abbrOf('ЦРУ, ФБР, НАТО, ООН і США — усе зрозуміло'), []);
+  assert.deepEqual(abbrOf('Нова ракета ERAM і система NASAMS'), ['ERAM', 'NASAMS']);
+  assert.deepEqual(abbrOf('Звичайний заголовок без скорочень'), []);
+  assert.deepEqual(abbrOf('Компанія Apple виходить на ринок'), [], 'звичайні слова не ловляться');
+  assert.deepEqual(abbrOf('ТЕЛЕФОНУВАННЯ ВЕЛИКИМИ ЛІТЕРАМИ'), [], 'довгі слова великими — не скорочення');
+});
+
+test('КАНДИДАТИ: частоти накопичуються між випусками, старі випадають, список обмежений', () => {
+  const day = 86400e3;
+  let f = mergeAbbrCandidates({}, [{ id: 1, title: 'Удар по ОВА' }, { id: 2, title: 'ОВА повідомила' }, { id: 3, title: 'Нова ERAM' }], NOW);
+  assert.deepEqual(f.items.map((c) => [c.w, c.n]), [['ОВА', 2], ['ERAM', 1]]);
+  assert.ok(f.updated.startsWith('2026-11-20'));
+  f = mergeAbbrCandidates(f, [{ id: 4, title: 'Знову ERAM' }], NOW + day);
+  assert.deepEqual(f.items.map((c) => [c.w, c.n]).sort(), [['ERAM', 2], ['ОВА', 2]]);
+  assert.equal(f.items.find((c) => c.w === 'ОВА').lastSeen, NOW, 'давно не бачене не оновлює дату');
+  const later = mergeAbbrCandidates(f, [], NOW + (CANDIDATE_KEEP_DAYS + 2) * day);
+  assert.deepEqual(later.items, [], 'кандидати, яких давно немає у стрічці, випадають');
+  const one = mergeAbbrCandidates({}, [{ id: 5, title: 'ОВА, ОВА, знову ОВА' }], NOW);
+  assert.equal(one.items[0].n, 1, 'одна новина додає одиницю, скільки б разів скорочення в ній не стояло');
+  assert.match(one.items[0].sample, /^ОВА, ОВА/);
+});
+
+test('ЗБІРКА: файл кандидатів пишеться й накопичується між запусками', async () => {
+  const r = await run({ ANTHROPIC_API_KEY: 'test' });
+  const a1 = JSON.parse(await readFile(join(r.dir, 'cache/abbr.json'), 'utf8'));
+  assert.ok(Array.isArray(a1.items), 'файл кандидатів має список');
+  assert.ok(a1.items.every((c) => typeof c.w === 'string' && c.n >= 1 && c.sample), 'у кожного кандидата є слово, лічильник і приклад');
+  assert.ok(!a1.items.some((c) => c.w === 'NYT'), 'те, що вже у словнику, в кандидати не потрапляє');
+  const r2 = await run({ ANTHROPIC_API_KEY: 'test' }, {}, r.dir);
+  const a2 = JSON.parse(await readFile(join(r2.dir, 'cache/abbr.json'), 'utf8'));
+  assert.ok(a2.items.length >= a1.items.length);
 });

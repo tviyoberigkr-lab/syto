@@ -74,14 +74,14 @@ jobs:
           # Рубрики українських заголовків (25.11): дешева модель; '0' у CLASSIFY_MAX_NEW зупиняє нові платні запити (кеш працює).
           CLASSIFY_MODEL: ${{ vars.CLASSIFY_MODEL || 'claude-haiku-5-5' }}
           CLASSIFY_MAX_NEW: ${{ vars.CLASSIFY_MAX_NEW }}
-      - name: Зберегти кеш перекладів і рубрик
+      - name: Зберегти кеші (переклади, рубрики, кандидати у словник)
         if: steps.fresh.outputs.skip != 'true'
         run: |
           date -u +%F > data/heartbeat.txt
           git config user.name "syto-bot"
           git config user.email "syto-bot@users.noreply.github.com"
-          git add data/translations.json data/classes.json data/heartbeat.txt
-          git diff --cached --quiet || (git commit -m "дані: кеш перекладів і рубрик [skip ci]" && git push)
+          git add data/translations.json data/classes.json data/abbr_candidates.json data/heartbeat.txt
+          git diff --cached --quiet || (git commit -m "дані: кеші перекладів, рубрик і кандидатів у словник [skip ci]" && git push)
       - uses: actions/configure-pages@v5
         if: steps.fresh.outputs.skip != 'true'
       - uses: actions/upload-pages-artifact@v4

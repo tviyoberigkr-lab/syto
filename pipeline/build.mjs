@@ -115,6 +115,12 @@ export async function build({
   for (const n of tr.notes) log(`  УВАГА: ${n}`);
   for (const e of tr.errors.slice(0, 3)) log(`  переклад: ${e}`);
   log(`Рубрики: ${cl.provider ?? 'лише правила (немає ключа)'}; нових ${cl.classified}, з кешу ${cl.fromCache}, помилок ${cl.failed}, у черзі ${cl.skipped}.`);
+  for (const t of ['ukraine', 'world']) {
+    const byId = new Map(stories.map((s) => [s.id, s]));
+    const counts = {};
+    for (const id of tabs[t]) { const k = byId.get(id)?.sub ?? '?'; counts[k] = (counts[k] ?? 0) + 1; }
+    log(`  рубрики «${t === 'ukraine' ? 'Україна' : 'Світ'}» (${tabs[t].length}): ` + Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(', '));
+  }
   if (cl.usage.calls) log(`Токени рубрик (${cl.model}): запитів ${cl.usage.calls}, вхід ${cl.usage.input}, вихід ${cl.usage.output}.`);
   for (const e of cl.errors.slice(0, 3)) log(`  рубрики: ${e}`);
   for (const h of health.filter((x) => !x.ok)) log(`  ✗ ${h.name}: ${h.error}`);

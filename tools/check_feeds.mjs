@@ -7,7 +7,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseFeed } from '../pipeline/lib.mjs';
+import { parseFeed, cleanText } from '../pipeline/lib.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const UA = 'Mozilla/5.0 (compatible; SytoNewsBot/1.0; +https://tviyoberigkr-lab.github.io/syto/)';
@@ -25,7 +25,7 @@ async function check(url) {
     const newest = dates.length ? new Date(Math.max(...dates)) : null;
     const ageH = newest ? Math.round((Date.now() - newest) / 3600e3) : null;
     const fresh = ageH !== null && ageH <= 72;
-    return { url, ok: fresh, why: fresh ? '' : newest ? `найсвіжіший запис ${ageH} год тому` : 'у записах немає дат', items: raw.length, newest: newest?.toISOString().slice(0, 16), ms, sample: raw[0]?.title?.slice(0, 70) };
+    return { url, ok: fresh, why: fresh ? '' : newest ? `найсвіжіший запис ${ageH} год тому` : 'у записах немає дат', items: raw.length, newest: newest?.toISOString().slice(0, 16), ms, sample: raw.slice(0, 3).map((r) => cleanText(r.title, 80)).join(' ⟋ ') };
   } catch (e) {
     return { url, ok: false, why: String(e?.cause?.code ?? e.message).slice(0, 80), ms: Date.now() - t0 };
   }
@@ -46,6 +46,6 @@ const results = await Promise.all(urls.map(check));
 let okN = 0;
 for (const r of results) {
   if (r.ok) okN++;
-  console.log(`${r.ok ? '✔' : '✗'} ${r.url}\n    ${r.ok ? `${r.items} записів, найсвіжіший ${r.newest}, ${r.ms} мс — «${r.sample}»` : r.why + ` (${r.ms} мс)`}`);
+  console.log(`${r.ok ? '✔' : '✗'} ${r.url}\n    ${r.ok ? `${r.items} записів, найсвіжіший ${r.newest}, ${r.ms} мс — ${r.sample}` : r.why + ` (${r.ms} мс)`}`);
 }
 console.log(`\nПрацює ${okN} з ${results.length}.`);

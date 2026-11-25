@@ -666,12 +666,13 @@ test('КАНДИДАТИ: частоти накопичуються між ви�
   let f = mergeAbbrCandidates({}, [{ id: 1, title: 'Удар по ОТУ' }, { id: 2, title: 'ОТУ повідомило' }, { id: 3, title: 'Нова ERAM' }], NOW);
   assert.deepEqual(f.items.map((c) => [c.w, c.n]), [['ОТУ', 2], ['ERAM', 1]]);
   assert.ok(f.updated.startsWith('2026-11-20'));
-  f = mergeAbbrCandidates(f, [{ id: 4, title: 'Знову ERAM' }], NOW + day);
-  assert.deepEqual(f.items.map((c) => [c.w, c.n]).sort(), [['ERAM', 2], ['ОТУ', 2]]);
+  f = mergeAbbrCandidates(f, [{ id: 4, title: 'Знову ERAM' }, { id: 5, title: 'ERAM ще раз' }], NOW + day);
+  assert.deepEqual(f.items.map((c) => [c.w, c.n, c.peak]).sort(), [['ERAM', 2, 2], ['ОТУ', 0, 2]],
+    'n — частота цього випуску, peak — найбільша за історію (та сама новина в кількох випусках не роздуває лічильник)');
   assert.equal(f.items.find((c) => c.w === 'ОТУ').lastSeen, NOW, 'давно не бачене не оновлює дату');
   const later = mergeAbbrCandidates(f, [], NOW + (CANDIDATE_KEEP_DAYS + 2) * day);
   assert.deepEqual(later.items, [], 'кандидати, яких давно немає у стрічці, випадають');
-  const one = mergeAbbrCandidates({}, [{ id: 5, title: 'ОТУ, ОТУ, знову ОТУ' }], NOW);
+  const one = mergeAbbrCandidates({}, [{ id: 9, title: 'ОТУ, ОТУ, знову ОТУ' }], NOW);
   assert.equal(one.items[0].n, 1, 'одна новина додає одиницю, скільки б разів скорочення в ній не стояло');
   assert.match(one.items[0].sample, /^ОТУ, ОТУ/);
   // скорочення, яке Клод переніс у словник або в загальновідомі, зникає зі списку кандидатів

@@ -135,7 +135,7 @@ export async function build({
   for (const e of cl.errors.slice(0, 3)) log(`  рубрики: ${e}`);
   const fresh = abbr.items.filter((c) => !abbrBefore.has(c.w));
   log(`Кандидати у словник скорочень: ${abbr.items.length} у списку, нових ${fresh.length}` +
-    (abbr.items.length ? `; найчастіші: ${abbr.items.slice(0, 8).map((c) => `${c.w}×${c.n}`).join(', ')}` : ''));
+    (abbr.items.length ? `; найчастіші: ${abbr.items.slice(0, 8).map((c) => `${c.w}×${c.peak ?? c.n}`).join(', ')}` : ''));
   for (const h of health.filter((x) => !x.ok)) log(`  ✗ ${h.name}: ${h.error}`);
   for (const h of health.filter((x) => x.ok && !x.items)) log(`  ⚠ ${h.name}: стрічка відповіла, але свіжих записів 0 (відкинуто ${h.dropped ?? 0})`);
   return { written: true, data };

@@ -94,13 +94,16 @@ export const CANDIDATE_LIMIT = 120;
 
 /**
  * Оновлює список кандидатів. prev — вміст data/abbr_candidates.json (або {}), items — повідомлення випуску.
- * Повертає новий вміст: { updated, items: [{ w, n, firstSeen, lastSeen, sample }] }, найчастіші згори.
+ * n — у скількох новинах ЦЬОГО випуску трапилося скорочення, peak — найбільше таке число за історію
+ * (за ним і сортуємо). Накопичувальний лічильник тут не годиться: новини живуть у сховищі дві доби й
+ * потрапляють у кілька випусків поспіль, тому сума за випусками завищувала б частоту в кілька разів.
+ * Повертає { updated, items: [{ w, n, peak, firstSeen, lastSeen, sample }] }, найчастіші згори.
  */
 export function mergeAbbrCandidates(prev, items, now = Date.now()) {
   const by = new Map();
   for (const c of prev?.items ?? []) {
     if (c && typeof c.w === 'string' && typeof c.lastSeen === 'number' && now - c.lastSeen <= CANDIDATE_KEEP_DAYS * 86400e3 && !KNOWN.has(c.w) && !COMMON_ABBR.has(c.w)) {
-      by.set(c.w, { ...c, n: Number(c.n) || 0 });
+      by.set(c.w, { ...c, n: 0, peak: Number(c.peak) || Number(c.n) || 0 });
     }
   }
   const seenNow = new Set();
@@ -111,10 +114,10 @@ export function mergeAbbrCandidates(prev, items, now = Date.now()) {
       if (seenNow.has(key)) continue;            // одна новина рахується один раз
       seenNow.add(key);
       const c = by.get(w);
-      if (c) { c.n++; c.lastSeen = now; if (!c.sample) c.sample = title.slice(0, 120); }
-      else by.set(w, { w, n: 1, firstSeen: now, lastSeen: now, sample: title.slice(0, 120) });
+      if (c) { c.n++; c.peak = Math.max(c.peak ?? 0, c.n); c.lastSeen = now; if (!c.sample) c.sample = title.slice(0, 120); }
+      else by.set(w, { w, n: 1, peak: 1, firstSeen: now, lastSeen: now, sample: title.slice(0, 120) });
     }
   }
-  const list = [...by.values()].sort((a, b) => b.n - a.n || a.w.localeCompare(b.w)).slice(0, CANDIDATE_LIMIT);
+  const list = [...by.values()].sort((a, b) => (b.peak - a.peak) || (b.n - a.n) || a.w.localeCompare(b.w)).slice(0, CANDIDATE_LIMIT);
   return { updated: new Date(now).toISOString(), items: list };
 }

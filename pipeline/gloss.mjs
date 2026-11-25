@@ -29,6 +29,12 @@ export const STATIC_GLOSS = [
   { w: 'БЕБ', e: 'БЕБ — Бюро економічної безпеки України.' },
   { w: 'МАГАТЕ', e: 'МАГАТЕ — Міжнародне агентство з атомної енергії при ООН.' },
   { w: 'ATACMS', e: 'ATACMS — американські тактичні балістичні ракети для пускових установок HIMARS і M270.' },
+  // перший щотижневий прохід, 25.11.2026: найчастіші кандидати зі збору
+  { w: 'НПЗ', e: 'НПЗ — нафтопереробний завод, підприємство, що переробляє нафту на пальне.' },
+  { w: 'ОВА', e: 'ОВА — обласна військова адміністрація, обласна влада на час воєнного стану.' },
+  { w: 'УЄФА', e: 'УЄФА — Союз європейських футбольних асоціацій, що проводить клубні турніри й чемпіонати Європи.' },
+  { w: 'BYD', e: 'BYD — китайський виробник електромобілів і акумуляторів.' },
+  { w: 'GTA', e: 'GTA — Grand Theft Auto, серія відеоігор компанії Rockstar Games.' },
 ];
 
 const bounded = (w) => new RegExp('(?<![\\p{L}\\p{N}])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\p{L}\\p{N}])', 'u');
@@ -65,9 +71,9 @@ export function withStaticGloss(text, aiGloss) {
 const KNOWN = new Set(STATIC_GLOSS.map((g) => g.w));
 /** Скорочення, зрозумілі без пояснення: у кандидати не беремо. */
 export const COMMON_ABBR = new Set((
-  'BBC CNN UN EU USA US UK NATO WHO NASA FBI CIA USD EUR GDP CEO IT AI VPN SMS GPS USB TV DNA PCR UFC NBA NFL NHL MLB UEFA FIFA ' +
+  'BBC CNN BMW UN EU USA US UK NATO WHO NASA FBI CIA USD EUR GDP CEO IT AI VPN SMS GPS USB TV DNA PCR UFC NBA NFL NHL MLB UEFA FIFA ' +
   'ООН НАТО ЄС США СРСР СНД ЗСУ СБУ ГУР МВС МОЗ МЗС ДСНС ТЦК ППО РФ РБ КНР КНДР ОАЕ ЄСПЛ МВФ ВООЗ ДТП ЗМІ ІТ ШІ ВВП ПДВ ФОП ТОВ ЖКГ ЦРУ ФБР БПЛА ЗРК ГЕС АЕС ТЕС ЛЕП ' +
-  'ОРДЛО ОТГ ЦНАП ЦПК НАБУ САП ДБР ЗНО НМТ УПЦ ПЦУ'
+  'ОРДЛО ОТГ ЦНАП ЦПК НАБУ САП ДБР ЗНО НМТ УПЦ ПЦУ СІЗО ХАМАС БМВ'
 ).split(' '));
 
 const ABBR_RE = /(?<![\p{L}\p{N}])(?:[A-Z][A-Z&-]{1,5}|[А-ЯЄІЇҐ][А-ЯЄІЇҐ-]{1,5})(?![\p{L}\p{N}])/gu;
@@ -93,7 +99,7 @@ export const CANDIDATE_LIMIT = 120;
 export function mergeAbbrCandidates(prev, items, now = Date.now()) {
   const by = new Map();
   for (const c of prev?.items ?? []) {
-    if (c && typeof c.w === 'string' && typeof c.lastSeen === 'number' && now - c.lastSeen <= CANDIDATE_KEEP_DAYS * 86400e3 && !KNOWN.has(c.w)) {
+    if (c && typeof c.w === 'string' && typeof c.lastSeen === 'number' && now - c.lastSeen <= CANDIDATE_KEEP_DAYS * 86400e3 && !KNOWN.has(c.w) && !COMMON_ABBR.has(c.w)) {
       by.set(c.w, { ...c, n: Number(c.n) || 0 });
     }
   }

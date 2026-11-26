@@ -57,3 +57,19 @@ https://zelenasadyba.com.ua/feed/
 https://ogorodnik.in.ua/feed/
 https://dachnik.in.ua/feed/
 https://sad.in.ua/feed/
+# --- сад і город: друга хвиля пошуку (26.11.2026) ---
+# Перевірено ще 95 адрес; з GitHub відповідає лише ця тематична стрічка:
+https://vikna.tv/styl-zhyttya/sadivnycztvo-ta-gorod/feed/
+# Не підійшли: tsn.ua/rss/lady/dacha.rss і tsn.ua/rss/full-feed/dacha.rss (віддають увесь фід каналу, не садовий),
+# glavred.net/rss/, zaxid.net/rss/, vikna.tv/feed/, 24tv.ua/rss/all.xml, life.pravda.com.ua/rss/, ukr.media/rss/,
+# fakty.com.ua/ua/feed/, vsviti.com.ua/feed/ — загальні стрічки без садової рубрики.
+# Агровидання (працюють, але це агробізнес, а не поради дачникам): agronom.com.ua/feed/, agroexpert.ua/feed/,
+# agrotimes.ua/feed/, agravery.com/rss.
+# Не відповідають або не мають RSS: sadogorod.in.ua, sad-gorod.in.ua, sadivnyctvo.com, moyadacha.org, ogorodnik.com,
+# kvitkar.com.ua, botanichka.com.ua, ua-dachnik.com, sadok.in.ua, gorod-sad.com.ua, sadivnyk.com, dacha.net.ua,
+# sadiba.com.ua, sadovod.in.ua, kvitucha-sadyba.com.ua, sadroslyn.com.ua, nasinnya.ua, florium.ua, yaskrava-klumba.com.ua,
+# agro-market.net, sadok.ua, sadogorod.club, sadovnyk.com.ua, greenmarket.com.ua, pro-sad.in.ua, moyasadyba.com.ua,
+# ogorod.ua, ogorod.in.ua, sadgorod.in.ua, sadogorod.org.ua, ferma.co.ua, agro-sector.com.ua, ukrsadvinprom.org,
+# sadivnytstvo.com, kvity.ua, rozsada.com.ua, semena.in.ua, nasinnya.org, dachnik.org.ua, sadgorod.pp.ua,
+# novyny.live, telegraf.com.ua, znaj.ua, politeka.net, gazeta.ua, obozrevatel.com, thepage.ua, superdom.ua.
+

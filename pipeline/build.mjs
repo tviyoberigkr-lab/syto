@@ -84,6 +84,15 @@ export async function build({
   const provider = pickProvider(env);
   const cl = await classifyItems(items, classes, { provider, maxNew: env.CLASSIFY_MAX_NEW === undefined || env.CLASSIFY_MAX_NEW === '' ? 400 : Number(env.CLASSIFY_MAX_NEW), fetchImpl, now });
 
+  // Прості теми — дешевою моделлю (рішення Романа 26.11 про витрати): тематичні стрічки (спорт, авто,
+  // курйози, сад) і технологічні видання. Новини війни, політики, економіки й фактчек лишаються на головній
+  // моделі: там ціна помилки в перекладі висока.
+  const srcById = new Map(sources.map((s) => [s.id, s]));
+  for (const it of items) {
+    const s = srcById.get(it.src);
+    if (s && (s.sub || s.cat === 'tech')) it.cheap = true;
+  }
+
   // Кандидати у словник скорочень: збираються самі щовипуску, пояснення Клод дописує руками раз на тиждень.
   let abbr = { items: [] };
   try { abbr = JSON.parse(await readFile(abbrPath, 'utf8')); } catch { /* першого разу файла ще немає */ }
@@ -94,7 +103,7 @@ export async function build({
   const okFeeds = health.filter((h) => h.ok).length;
   const data = {
     generatedAt: new Date(now).toISOString(),
-    stats: { feedsOk: okFeeds, feedsTotal: sources.length, items: items.length, stories: stories.length, translation: { provider: tr.provider, translated: tr.translated, fromCache: tr.fromCache, failed: tr.failed, pending: tr.skipped },
+    stats: { feedsOk: okFeeds, feedsTotal: sources.length, items: items.length, stories: stories.length, translation: { provider: tr.provider, translated: tr.translated, cheap: tr.cheapTexts, fromCache: tr.fromCache, failed: tr.failed, pending: tr.skipped },
       classification: { provider: cl.provider, classified: cl.classified, fromCache: cl.fromCache, failed: cl.failed, pending: cl.skipped } },
     sources: sources.map(({ id, name, type, lang, country, cat, sub, trust, group }) => ({ id, name, type, lang, country, cat, ...(sub ? { sub } : {}), trust, ...(group ? { group } : {}) })),
     health, tabs, stories,
@@ -119,8 +128,12 @@ export async function build({
   await writeFile(storePath, storeSnapshot);
 
   log(`Готово: ${stories.length} новин із ${items.length} повідомлень (свіжих із мережі ${all.length}, зі сховища ${kept}); стрічок працює ${okFeeds}/${sources.length}.`);
-  log(`Переклад: ${tr.provider ?? 'вимкнено (немає ключа)'}; нових ${tr.translated}, з кешу ${tr.fromCache}, помилок ${tr.failed}, у черзі ${tr.skipped}.`);
-  if (tr.usage.calls) log(`Токени перекладу (${tr.model}): запитів ${tr.usage.calls}, вхід ${tr.usage.input}, вихід ${tr.usage.output} (з них на міркування ${tr.usage.thinking}).`);
+  log(`Переклад: ${tr.provider ?? 'вимкнено (немає ключа)'}; нових ${tr.translated} (з них дешевою моделлю ${tr.cheapTexts}), з кешу ${tr.fromCache}, помилок ${tr.failed}, у черзі ${tr.skipped}.`);
+  if (tr.usage.calls) {
+    const byModel = Object.entries(tr.usage.byModel ?? {}).map(([m, n]) => `${m}×${n}`).join(', ');
+    log(`Токени перекладу: запитів ${tr.usage.calls} (${byModel || tr.model}), вхід ${tr.usage.input}, ` +
+      `з кешу інструкції ${tr.usage.cacheRead} (запис ${tr.usage.cacheWrite}), вихід ${tr.usage.output} (з них на міркування ${tr.usage.thinking}).`);
+  }
   if (tr.rejected) log(`  переклад: відхилено перевіркою правдоподібності ${tr.rejected} — лишились в оригіналі.`);
   for (const n of tr.notes) log(`  УВАГА: ${n}`);
   for (const e of tr.errors.slice(0, 3)) log(`  переклад: ${e}`);
@@ -131,7 +144,7 @@ export async function build({
     for (const id of tabs[t]) { const k = byId.get(id)?.sub ?? '?'; counts[k] = (counts[k] ?? 0) + 1; }
     log(`  рубрики «${t === 'ukraine' ? 'Україна' : 'Світ'}» (${tabs[t].length}): ` + Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(', '));
   }
-  if (cl.usage.calls) log(`Токени рубрик (${cl.model}): запитів ${cl.usage.calls}, вхід ${cl.usage.input}, вихід ${cl.usage.output}.`);
+  if (cl.usage.calls) log(`Токени рубрик (${cl.model}): запитів ${cl.usage.calls}, вхід ${cl.usage.input}, з кешу інструкції ${cl.usage.cacheRead} (запис ${cl.usage.cacheWrite}), вихід ${cl.usage.output}.`);
   for (const e of cl.errors.slice(0, 3)) log(`  рубрики: ${e}`);
   const fresh = abbr.items.filter((c) => !abbrBefore.has(c.w));
   log(`Кандидати у словник скорочень: ${abbr.items.length} у списку, нових ${fresh.length}` +

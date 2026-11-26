@@ -71,6 +71,8 @@ jobs:
           TRANSLATE_MODEL: ${{ vars.TRANSLATE_MODEL || 'claude-sonnet-5-5' }}   # 22.11: Sonnet 5.5 за рішенням Романа (платиться з подарункових кредитів)
           # Щоб зупинити нові переклади (витрати), постав тут '0': уже перекладене береться з кешу безкоштовно.
           TRANSLATE_MAX_NEW: ${{ vars.TRANSLATE_MAX_NEW }}
+          # 26.11: прості теми (спорт, авто, курйози, сад, техно) перекладає дешева модель — рішення Романа про витрати
+          TRANSLATE_MODEL_CHEAP: ${{ vars.TRANSLATE_MODEL_CHEAP || 'claude-haiku-5-5' }}
           # Рубрики українських заголовків (25.11): дешева модель; '0' у CLASSIFY_MAX_NEW зупиняє нові платні запити (кеш працює).
           CLASSIFY_MODEL: ${{ vars.CLASSIFY_MODEL || 'claude-haiku-5-5' }}
           CLASSIFY_MAX_NEW: ${{ vars.CLASSIFY_MAX_NEW }}

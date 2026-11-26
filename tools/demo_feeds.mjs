@@ -155,7 +155,9 @@ export function demoFetch(now = Date.now(), { translatorFails = false, failFeeds
     if (url.includes('anthropic.com') || url.includes('googleapis.com')) {
       if (translatorFails) { calls.translate++; return new Response('overloaded', { status: 529 }); }
       const body = JSON.parse(opts.body);
-      const system = body.system ?? body.systemInstruction?.parts?.[0]?.text ?? '';
+      // system тепер масив текстових блоків (кешування інструкції), Gemini — systemInstruction
+      const system = typeof body.system === 'string' ? body.system
+        : (body.system?.[0]?.text ?? body.systemInstruction?.parts?.[0]?.text ?? '');
       const prompt = body.messages?.[0]?.content ?? body.contents?.[0]?.parts?.[0]?.text;
       const titles = JSON.parse(prompt.slice(prompt.indexOf('<texts>') + 7, prompt.lastIndexOf('</texts>')));
       // Класифікатор рубрик (українські заголовки) відрізняється системним промптом: відповідь — лише коди.

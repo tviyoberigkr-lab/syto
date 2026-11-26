@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { SUBS, SUB_CODES, isSub } from './subs.mjs';
 
-export const BATCH = 15; // менший пакет: відповідь не впирається в ліміт довжини
+export const BATCH = 25; // 26.11: більший пакет — менше повторів системної інструкції; ділення навпіл при збої лишилось
 const CONCURRENCY = 4;
 const CACHE_DAYS = 10;
 
@@ -182,7 +182,11 @@ async function callAnthropic(titles, { apiKey, model, fetchImpl, usage, notes, s
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
-      model, system,
+      // Кешування системної інструкції (26.11, рішення Романа про витрати): інструкція однакова в усіх запитах
+      // випуску, а раніше оплачувалася щоразу як нові вхідні токени. Запис у кеш коштує 1,25× ціни входу,
+      // читання — 0,05× для Sonnet 5.5 і 0,1× для Haiku; кеш живе 5 хвилин і оновлюється кожним запитом,
+      // а всі запити випуску йдуть за секунди. Якщо модель не підтримує кеш, поля usage просто будуть нульові.
+      model, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
       max_tokens: withFlag || !noThinking ? maxTokens(titles.length) : 8000,
       ...(withFlag ? { thinking: offFlag } : {}),
       messages: [{ role: 'user', content: userContent(titles) }],
@@ -200,6 +204,9 @@ async function callAnthropic(titles, { apiKey, model, fetchImpl, usage, notes, s
   if (usage) {
     usage.calls++; usage.input += j?.usage?.input_tokens ?? 0; usage.output += j?.usage?.output_tokens ?? 0;
     usage.thinking += j?.usage?.output_tokens_details?.thinking_tokens ?? 0;
+    usage.cacheWrite = (usage.cacheWrite ?? 0) + (j?.usage?.cache_creation_input_tokens ?? 0);
+    usage.cacheRead = (usage.cacheRead ?? 0) + (j?.usage?.cache_read_input_tokens ?? 0);
+    if (model) { usage.byModel = usage.byModel ?? {}; usage.byModel[model] = (usage.byModel[model] ?? 0) + 1; }
   }
   if (j?.stop_reason === 'max_tokens') throw new Error('відповідь обрізано лімітом max_tokens');
   return j?.content?.map((c) => c.text ?? '').join('') ?? '';
@@ -224,9 +231,11 @@ async function callGemini(titles, { apiKey, model, fetchImpl, usage, system = SY
 }
 
 export function pickProvider(env) {
-  // classifyModel — модель для рубрик українських текстів: дешевша за перекладача (рішення Романа 25.11: Haiku).
-  if (env.GEMINI_API_KEY) return { name: 'gemini', apiKey: env.GEMINI_API_KEY, model: env.TRANSLATE_MODEL || 'gemini-3.1-flash-lite', classifyModel: env.CLASSIFY_MODEL || 'gemini-3.1-flash-lite', call: callGemini };
-  if (env.ANTHROPIC_API_KEY) return { name: 'anthropic', apiKey: env.ANTHROPIC_API_KEY, model: env.TRANSLATE_MODEL || 'claude-haiku-5-5', classifyModel: env.CLASSIFY_MODEL || 'claude-haiku-5-5', call: callAnthropic };
+  // model — головна модель перекладу (війна, політика, економіка: там ціна помилки висока);
+  // cheapModel — для простих текстів (спорт, авто, курйози, сад, техностроки): рішення Романа 26.11 про витрати;
+  // classifyModel — рубрики українських заголовків (25.11).
+  if (env.GEMINI_API_KEY) return { name: 'gemini', apiKey: env.GEMINI_API_KEY, model: env.TRANSLATE_MODEL || 'gemini-3.1-flash-lite', cheapModel: env.TRANSLATE_MODEL_CHEAP || env.TRANSLATE_MODEL || 'gemini-3.1-flash-lite', classifyModel: env.CLASSIFY_MODEL || 'gemini-3.1-flash-lite', call: callGemini };
+  if (env.ANTHROPIC_API_KEY) return { name: 'anthropic', apiKey: env.ANTHROPIC_API_KEY, model: env.TRANSLATE_MODEL || 'claude-haiku-5-5', cheapModel: env.TRANSLATE_MODEL_CHEAP || 'claude-haiku-5-5', classifyModel: env.CLASSIFY_MODEL || 'claude-haiku-5-5', call: callAnthropic };
   return null;
 }
 
@@ -243,7 +252,7 @@ const usable = (c) => c && typeof c.t === 'string' && c.t.length > 0;
  * Помилка пакета не валить збірку: ці тексти лишаються в оригіналі.
  */
 export async function translateItems(items, cache, { provider, maxNew = 400, fetchImpl = fetch, now = Date.now() } = {}) {
-  const stats = { provider: provider?.name ?? null, model: provider?.model ?? null, fromCache: 0, translated: 0, failed: 0, rejected: 0, skipped: 0, errors: [], notes: [], usage: { calls: 0, input: 0, output: 0, thinking: 0 } };
+  const stats = { provider: provider?.name ?? null, model: provider?.model ?? null, cheapModel: provider?.cheapModel ?? null, fromCache: 0, translated: 0, cheapTexts: 0, failed: 0, rejected: 0, skipped: 0, errors: [], notes: [], usage: { calls: 0, input: 0, output: 0, thinking: 0, cacheWrite: 0, cacheRead: 0 } };
   const foreign = items.filter((i) => i.lang !== 'uk');
   // спершу всі заголовки, потім описи — щоб при ліміті заголовки не лишалися без перекладу
   const fields = [['title', 'titleUk', 'titleGloss'], ['summary', 'summaryUk', 'summaryGloss']];
@@ -268,7 +277,7 @@ export async function translateItems(items, cache, { provider, maxNew = 400, fet
       } else if (count && !seen.has(k)) {
         seen.add(k);
         if (c && c.fail >= MAX_FAILS) { if (now - c.ts > 86400e3) c.ts = now; continue; } // безнадійний текст — не платимо за нього знову
-        todo.push({ text, src: it.src ?? '' });
+        todo.push({ text, src: it.src ?? '', cheap: !!it.cheap });
       }
     }
   };
@@ -276,11 +285,13 @@ export async function translateItems(items, cache, { provider, maxNew = 400, fet
   if (provider) {
     const queue = todo.slice(0, Math.max(0, maxNew));
     stats.skipped = todo.length - queue.length;
-    // пакети лише в межах одного джерела
+    // пакети лише в межах одного джерела; модель — за джерелом (прості теми дешевою, решта головною)
     const bySrc = new Map();
-    for (const q of queue) { if (!bySrc.has(q.src)) bySrc.set(q.src, []); bySrc.get(q.src).push(q.text); }
+    for (const q of queue) { if (!bySrc.has(q.src)) bySrc.set(q.src, { cheap: q.cheap, texts: [] }); bySrc.get(q.src).texts.push(q.text); }
     const batches = [];
-    for (const texts of bySrc.values()) for (let i = 0; i < texts.length; i += BATCH) batches.push(texts.slice(i, i + BATCH));
+    for (const { cheap, texts } of bySrc.values()) {
+      for (let i = 0; i < texts.length; i += BATCH) batches.push({ cheap, texts: texts.slice(i, i + BATCH) });
+    }
     const maxCalls = batches.length * 2 + 10; // бюджет запитів: поділ невдалих пакетів не може розростися без меж
     let calls = 0; // рахуємо самі: постачальник може не повернути статистику
     const overBudget = () => calls >= maxCalls || stats.usage.output >= MAX_OUT_TOKENS_PER_RUN;
@@ -288,11 +299,13 @@ export async function translateItems(items, cache, { provider, maxNew = 400, fet
       stats.failed += batch.length;
       if (stats.errors.length < 5) stats.errors.push(String(why).slice(0, 160));
     };
-    const run = async (batch) => {
+    const run = async (batch, cheap = false) => {
       if (overBudget()) return fail(batch, 'вичерпано бюджет запитів на цей запуск');
       calls++;
+      // прості теми (спорт, авто, курйози, сад) — дешевою моделлю; новини війни й політики лишаються на головній
+      const model = cheap ? (provider.cheapModel ?? provider.model) : provider.model;
       try {
-        const reply = await provider.call(batch, { apiKey: provider.apiKey, model: provider.model, fetchImpl, usage: stats.usage, notes: stats.notes });
+        const reply = await provider.call(batch, { apiKey: provider.apiKey, model, fetchImpl, usage: stats.usage, notes: stats.notes });
         const out = parseEntries(reply, batch.length);
         batch.forEach((t, j) => {
           const fx = fixMixed(t, out[j].t);
@@ -301,12 +314,13 @@ export async function translateItems(items, cache, { provider, maxNew = 400, fet
           // o — оригінал: потрібен, щоб перевіряти якість перекладу проти джерела; g — лише коли є терміни
           cache[key(t)] = { t: out[j].t, o: t, ...(out[j].g ? { g: out[j].g } : {}), ...(out[j].c ? { c: out[j].c } : {}), ts: now };
           stats.translated++;
+          if (cheap) stats.cheapTexts++;
         });
       } catch (e) {
         if (batch.length > 1 && !/HTTP (401|403|429|5\d\d)/.test(String(e.message))) {
           const mid = Math.ceil(batch.length / 2);
-          await run(batch.slice(0, mid));
-          await run(batch.slice(mid));
+          await run(batch.slice(0, mid), cheap);
+          await run(batch.slice(mid), cheap);
         } else {
           fail(batch, e.message ?? e);
           // текст не пройшов навіть наодинці (і це не збій сервера) — запам'ятовуємо
@@ -314,7 +328,7 @@ export async function translateItems(items, cache, { provider, maxNew = 400, fet
         }
       }
     };
-    const worker = async () => { for (let batch; (batch = batches.shift());) await run(batch); };
+    const worker = async () => { for (let b; (b = batches.shift());) await run(b.texts, b.cheap); };
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, batches.length) }, worker));
     apply(false);
   } else {
@@ -334,7 +348,7 @@ const classifyTokens = (n) => 60 + 8 * n; // відповідь — лише к�
  * Помилка не валить збірку: новина без мітки отримає рубрику за правилами (subOf у lib.mjs).
  */
 export async function classifyItems(items, cache, { provider, maxNew = 400, fetchImpl = fetch, now = Date.now() } = {}) {
-  const stats = { provider: provider?.name ?? null, model: provider?.classifyModel ?? null, fromCache: 0, classified: 0, failed: 0, skipped: 0, errors: [], usage: { calls: 0, input: 0, output: 0, thinking: 0 } };
+  const stats = { provider: provider?.name ?? null, model: provider?.classifyModel ?? null, fromCache: 0, classified: 0, failed: 0, skipped: 0, errors: [], usage: { calls: 0, input: 0, output: 0, thinking: 0, cacheWrite: 0, cacheRead: 0 } };
   const need = items.filter((i) => i.title && !isSub(i.cls));
   const todo = [];
   const seen = new Set();

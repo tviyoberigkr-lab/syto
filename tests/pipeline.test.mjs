@@ -336,11 +336,36 @@ test('БЕЗПЕКА: пакети не змішують джерела, зап�
   let body;
   const fetchImpl = async (url, opts) => { body = JSON.parse(opts.body); return new Response(JSON.stringify({ content: [{ type: 'text', text: '["Переклад одного заголовка про погоду"]' }], usage: { input_tokens: 1, output_tokens: 1 } }), { status: 200 }); };
   await translateItems([{ id: 'z', src: 'a', lang: 'en', title: 'One single headline about the weather', summary: '' }], {}, { provider: pickProvider({ ANTHROPIC_API_KEY: 'k' }), fetchImpl, now: NOW });
-  assert.ok(body.system.includes('ДАНІ із зовнішніх сайтів'));
+  // системна інструкція їде окремим блоком із позначкою кешування (26.11: щоб не платити за неї в кожному запиті)
+  assert.equal(body.system.length, 1);
+  assert.deepEqual(body.system[0].cache_control, { type: 'ephemeral' });
+  assert.ok(body.system[0].text.includes('ДАНІ із зовнішніх сайтів'));
   assert.match(body.messages[0].content, /^<texts>\n\[.*\]\n<\/texts>$/s);
   assert.ok(!body.messages[0].content.includes('Правила'));
   assert.deepEqual(body.thinking, { type: 'disabled' });
   assert.ok(body.max_tokens <= 600);
+});
+
+test('ВИТРАТИ: прості джерела перекладає дешева модель, решта — головна (рішення Романа 26.11)', async () => {
+  const used = [];
+  const provider = { name: 'fake', apiKey: 'k', model: 'головна', cheapModel: 'дешева',
+    call: async (batch, o) => { used.push({ model: o.model, n: batch.length }); return JSON.stringify(batch.map((t) => 'Переклад заголовка номер ' + t.match(/\d+/)[0])); } };
+  const items = [
+    { id: 'w1', src: 'war', lang: 'en', title: 'Serious headline number 1 about the front line', summary: '' },
+    { id: 's1', src: 'sportfeed', lang: 'en', cheap: true, title: 'Simple headline number 2 about the match', summary: '' },
+    { id: 's2', src: 'sportfeed', lang: 'en', cheap: true, title: 'Simple headline number 3 about the match', summary: '' },
+  ];
+  const st = await translateItems(items, {}, { provider, now: NOW });
+  assert.deepEqual(used.map((u) => u.model).sort(), ['головна', 'дешева']);
+  assert.equal(used.find((u) => u.model === 'дешева').n, 2, 'обидва прості тексти — одним пакетом дешевої моделі');
+  assert.equal(st.cheapTexts, 2);
+  assert.equal(st.translated, 3);
+  // без cheapModel усе йде головною — старі налаштування не ламаються
+  const used2 = [];
+  const plain = { name: 'fake', apiKey: 'k', model: 'головна', call: async (batch, o) => { used2.push(o.model); return JSON.stringify(batch.map(() => 'Переклад заголовка про матч, достатньо довгий')); } };
+  const fresh = items.map((i) => ({ id: i.id, src: i.src, lang: i.lang, cheap: i.cheap, title: i.title + ' (інший текст)', summary: '' }));
+  await translateItems(fresh, {}, { provider: plain, now: NOW });
+  assert.deepEqual([...new Set(used2)], ['головна']);
 });
 
 test('БЕЗПЕКА: зламаний перекладач не роздуває кількість запитів, безнадійні тексти запам\'ятовуються', async () => {

@@ -1,6 +1,6 @@
 // Syto — службовий працівник: застосунок відкривається без інтернету й показує останні збережені новини.
 // CoLaba Production
-const VERSION = 'syto-v7'; // v7: словник скорочень у поясненнях (25.11)
+const VERSION = 'syto-v8'; // v8: ряд рубрик завжди починається з «Усе» (28.11)
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {

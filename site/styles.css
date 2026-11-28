@@ -32,14 +32,16 @@ main:focus{outline:none}
 h2{font:700 24px/1.2 var(--serif);margin:0}
 .hint{margin:4px 0 12px;color:var(--muted);font-size:14px}
 /* Рубрики: один ряд із горизонтальною прокруткою, щоб на телефоні всі 10 кнопок не займали пів екрана. */
-.subs{display:flex;gap:8px;overflow-x:auto;margin:0 -12px 10px;padding:2px 12px 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+/* Праворуч ряд плавно згасає — видно, що рубрики тривають далі й ряд можна гортати пальцем. */
+.subs{display:flex;gap:8px;overflow-x:auto;margin:0 -12px 10px;padding:2px 12px 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  -webkit-mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 28px),transparent)}
 .subs::-webkit-scrollbar{display:none}
 .subs .chip{flex:0 0 auto;min-height:44px;padding:8px 14px}
 .chip.sub[aria-pressed="true"]{background:var(--accent);color:#000;border-color:var(--accent)}
 /* Комп'ютер (широке вікно або мишка): горизонтальна смуга рубрик колесом миші не гортається —
    тому там рубрики переносяться рядками і видно всі одразу. На телефоні лишається прокрутка пальцем. */
 @media (min-width: 560px), (hover: hover) and (pointer: fine){
-  .subs{flex-wrap:wrap;overflow-x:visible;margin:0 0 10px;padding:0}
+  .subs{flex-wrap:wrap;overflow-x:visible;margin:0 0 10px;padding:0;-webkit-mask-image:none;mask-image:none}
   .subs .chip{flex:0 1 auto}
 }
 .filters{display:flex;gap:8px;flex-wrap:wrap}

@@ -52,6 +52,11 @@ async def main():
                 subs = page.locator('#subs .sub')
                 check(await subs.count() == 10 and await subs.first.inner_text() == 'Усе', f'ряд рубрик у «Україні» ({await subs.count()} кнопок)')
                 check(await page.locator('#subs .sub[aria-pressed="true"]').inner_text() == 'Усе', 'типово вибрано «Усе»')
+                # 28.11: ряд рубрик завжди відкривається з «Усе» (раніше автопрокрутка ховала перші кнопки)
+                start = await page.evaluate("(() => { const b = document.getElementById('subs');"
+                                            " const f = b.firstElementChild.getBoundingClientRect(); const r = b.getBoundingClientRect();"
+                                            " return { scroll: b.scrollLeft, visible: f.left >= r.left - 1 && f.text !== '' , label: b.firstElementChild.textContent }; })()")
+                check(start['scroll'] == 0 and start['visible'] and start['label'] == 'Усе', f"ряд починається з «Усе» (зсув {start['scroll']}px)")
                 await page.click('#subs .sub[data-sub="economy"]')
                 n_eco = await page.locator('.card').count()
                 check(0 < n_eco < n_all and 'електричк' in await page.locator('.card').first.inner_text(), f'рубрика «Економіка» показує лише свої новини ({n_eco})')
@@ -84,6 +89,7 @@ async def main():
                 check(await page.locator('#subs').is_hidden(), 'у «Фейках» рубрик немає')
                 await page.click('.tabs a[data-tab="world"]'); await wait_title(page, 'Світ')
                 check(await page.locator('#subs .sub').count() == 8 and await page.locator('#subs .sub[data-sub="garden"]').count() == 0, 'у «Світі» 7 рубрик без саду та ІТ')
+                check(await page.evaluate("document.getElementById('subs').scrollLeft") == 0, 'у новій вкладці ряд теж від початку')
                 await page.click('.tabs a[data-tab="tech"]'); await wait_title(page, 'Технології та ШІ')
                 check(await page.locator('#subs').is_hidden(), 'у «Техно» рубрик немає')
                 # терміни з поясненнями (демо-новина у вкладці «Технології та ШІ»)
@@ -165,6 +171,29 @@ async def main():
                 check(not perr, 'прототип без помилок')
                 await p2.screenshot(path=os.path.join(ROOT, f'tests/shot-{scheme}-prototype.png'))
                 await ctx.close()
+            # ---- телефон із сенсорним екраном: ряд рубрик гортається, а не переноситься (28.11) ----
+            print('[touch] телефон 390x844, сенсор')
+            tctx = await b.new_context(viewport={'width': 390, 'height': 844}, locale='uk-UA', has_touch=True, is_mobile=True)
+            tpage = await tctx.new_page()
+            await tpage.goto(f'http://127.0.0.1:{PORT}/')
+            await tpage.wait_for_selector('.card')
+            row = await tpage.evaluate("(() => { const b = document.getElementById('subs');"
+                                       " const f = b.firstElementChild.getBoundingClientRect(); const r = b.getBoundingClientRect();"
+                                       " return { scrollable: b.scrollWidth > b.clientWidth + 4, left: b.scrollLeft,"
+                                       " firstWhole: f.left >= r.left - 1 && f.right <= r.right + 1, label: b.firstElementChild.textContent }; })()")
+            check(row['scrollable'], 'на телефоні ряд гортається (не переноситься рядками)')
+            check(row['left'] == 0 and row['label'] == 'Усе' and row['firstWhole'], 'видно цілу кнопку «Усе» на початку ряду')
+            # вибір далекої рубрики не ховає початок ряду при наступному відкритті вкладки
+            await tpage.evaluate("document.getElementById('subs').scrollLeft = 300")
+            await tpage.click('#subs .sub[data-sub="fun"]')
+            await tpage.click('.tabs a[data-tab="world"]'); await wait_title(tpage, 'Світ')
+            await tpage.click('.tabs a[data-tab="ukraine"]'); await wait_title(tpage, 'Україна')
+            back = await tpage.evaluate("(() => { const b = document.getElementById('subs');"
+                                        " return { left: b.scrollLeft, pressed: b.querySelector('[aria-pressed=\"true\"]').textContent }; })()")
+            check(back['left'] == 0 and back['pressed'] == 'Трохи сміху', 'після повернення у вкладку ряд знову від «Усе», вибір збережено')
+            await tpage.screenshot(path=os.path.join(ROOT, 'tests/shot-touch-subs.png'))
+            await tctx.close()
+
             # ---- комп'ютер: вікно 1280x800, мишка (25.11) ----
             print('[desktop] сайт у вікні 1280x800')
             ctx = await b.new_context(viewport={'width': 1280, 'height': 800}, locale='uk-UA')

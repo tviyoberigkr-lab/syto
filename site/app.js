@@ -192,7 +192,7 @@
   }
 
   /** Ряд кнопок-рубрик для вкладки: «Усе» + рубрики розділу. Поточний вибір — state.sub[tab] ('all' або код). */
-  function renderSubs() {
+  function renderSubs(keepScroll) {
     var box = $('subs'), tab = state.tab, subs = TAB_SUBS[tab];
     box.textContent = '';
     box.hidden = !subs;
@@ -205,16 +205,22 @@
       b.setAttribute('aria-pressed', String(code === cur));
       box.appendChild(b);
     });
-    var active = box.querySelector('[aria-pressed="true"]');
-    if (active && active.scrollIntoView) { try { active.scrollIntoView({ block: 'nearest', inline: 'center' }); } catch (e) { /* старі браузери */ } }
+    // 28.11: ряд ЗАВЖДИ починається з «Усе». Раніше він автоматично прокручувався до вибраної рубрики, і перші
+    // кнопки («Усе», «Війна», «Політика») ховалися за лівим краєм, а сусідня обрізалася навпіл. Тепер прокрутку
+    // зсуваємо лише тоді, коли людина сама гортала ряд і натиснула рубрику — щоб кнопка не втекла з-під пальця.
+    box.scrollLeft = keepScroll ? (subsScroll[tab] || 0) : 0;
   }
+  var subsScroll = {}; // де стоїть ряд рубрик у кожній вкладці (у межах сеансу перегляду)
 
-  function renderFeed() {
+  function renderFeed(keepSubsScroll) {
     var d = state.data, tab = state.tab, now = Date.now();
     $('view-title').textContent = TABS[tab].title;
-    $('view-hint').textContent = TABS[tab].hint;
+    // Назва вибраної рубрики — у підказці під заголовком: ряд гортається, і кнопка може бути за межею екрана,
+    // а людина має бачити, що стрічка зараз відфільтрована (28.11).
+    var curSub = TAB_SUBS[tab] ? (state.sub[tab] || 'all') : 'all';
+    $('view-hint').textContent = curSub === 'all' ? TABS[tab].hint : 'Рубрика «' + SUBS[curSub] + '». Щоб бачити весь розділ, натисніть «Усе».';
     $('filters').hidden = tab === 'fakes';
-    renderSubs();
+    renderSubs(keepSubsScroll);
     Array.prototype.forEach.call(document.querySelectorAll('#filters .chip'), function (c) {
       c.setAttribute('aria-pressed', String(c.getAttribute('data-filter') === state.filter));
     });
@@ -386,7 +392,8 @@
     if (!c) return;
     state.sub[state.tab] = c.getAttribute('data-sub');
     store('syto-sub', JSON.stringify(state.sub));
-    renderFeed();
+    subsScroll[state.tab] = $('subs').scrollLeft; // людина гортала ряд — лишаємо його там, де вона його поставила
+    renderFeed(true);
     window.scrollTo(0, 0);
   });
   $('filters').addEventListener('click', function (e) {
